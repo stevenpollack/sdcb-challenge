@@ -23,3 +23,5 @@ more heavily than an accurate `partial` or `broken`.
 | Message edits (m.replace) | working | Edited messages append [edited] and show new content in-place |
 | Room join via slash command | working | /join #alias:server joins room and updates room list |
 | Room leave via slash command | working | /leave leaves current room, removes from sidebar and clears pane |
+| Message search | working | /search <query> searches all loaded messages by body or sender, shows results in pane |
+| Room member list | working | /members lists all current members of the active room |
