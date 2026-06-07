@@ -862,6 +862,100 @@ async def test_action_quit_calls_logout():
 
 
 # ------------------------------------------------------------------
+# /me emote command
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_me_command_sends_emote():
+    app, client = make_app()
+    client.send_emote = AsyncMock(return_value="$emote1")
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        await _send_command(pilot, app, "/me waves hello")
+        client.send_emote.assert_called_once_with("!r1:m.org", "waves hello")
+
+
+@pytest.mark.asyncio
+async def test_me_command_no_room_is_noop():
+    app, client = make_app()
+    client.send_emote = AsyncMock()
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        await _send_command(pilot, app, "/me waves")
+        client.send_emote.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_me_command_empty_is_noop():
+    app, client = make_app()
+    client.send_emote = AsyncMock()
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        # Call handler directly with empty emote
+        import asyncio
+        await asyncio.ensure_future(app._handle_me(""))
+        await pilot.pause(0.1)
+        client.send_emote.assert_not_called()
+
+
+# ------------------------------------------------------------------
+# Unread badge clears on room select
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_unread_badge_clears_on_room_select():
+    app, client = make_app()
+    client.rooms["!r1:m.org"].unread_count = 5
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        # Verify badge shows before selecting
+        assert "[5]" in app._room_items["!r1:m.org"]._text()
+        from textual.widgets import ListView
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.2)
+        # Badge should be gone after selecting
+        assert "[5]" not in app._room_items["!r1:m.org"]._text()
+        assert client.rooms["!r1:m.org"].unread_count == 0
+
+
+# ------------------------------------------------------------------
+# Date separators in message pane
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_date_separator_shown_between_days():
+    app, client = make_app()
+    # Add messages on two different days
+    client.messages["!r1:m.org"] = [
+        Message("$a", "@alice:m.org", "day one message", 1699000000000),   # 2023-11-03
+        Message("$b", "@bob:m.org",   "day two message", 1699100000000),   # 2023-11-04
+    ]
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.2)
+        from textual.widgets import RichLog
+        log = app.query_one("#messages", RichLog)
+        # Should have date separator lines (more lines than just 2 messages)
+        assert len(log.lines) > 2
+
+
+# ------------------------------------------------------------------
 # Edge-case guard clauses
 # ------------------------------------------------------------------
 

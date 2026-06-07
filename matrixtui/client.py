@@ -276,6 +276,17 @@ class MatrixClient:
             return resp.event_id
         return None
 
+    async def send_emote(self, room_id: str, emote: str) -> str | None:
+        """Send an m.emote message (renders as '* username <emote>')."""
+        resp = await self._client.room_send(
+            room_id=room_id,
+            message_type="m.room.message",
+            content={"msgtype": "m.emote", "body": emote},
+        )
+        if isinstance(resp, RoomSendResponse):
+            return resp.event_id
+        return None
+
     async def send_read_receipt(self, room_id: str, event_id: str) -> None:
         """Mark a message as read."""
         try:

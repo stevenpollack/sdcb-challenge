@@ -13,7 +13,7 @@ more heavily than an accurate `partial` or `broken`.
 | Real-time sync loop | working | Background asyncio task; 30 s long-poll; auto-reconnects on error |
 | Load older history | working | Ctrl+R fetches prior page via /messages; prepends to message list |
 | Display names & timestamps | working | Sender localpart shown; UTC HH:MM timestamp per message |
-| Unread count badge | partial | Count shown in room list when server reports unread_notifications; resets only on server side |
+| Unread count badge | working | Count shown in room list; zeroed locally and badge removed immediately when room is selected |
 | Non-text message types | working | Images, files, video, audio shown as [type: filename]; emotes prefixed with *; notices dimmed |
 | Typing indicators | working | Status line below messages shows "alice is typing…" updated via TypingNoticeEvent |
 | Member count in room title | working | Room title bar shows (N) member count after display name |
@@ -31,3 +31,5 @@ more heavily than an accurate `partial` or `broken`.
 | Invite notifications | working | Incoming invites shown in status bar with /join prompt; stored in client.invites dict |
 | Room topic display | working | /topic shows current room topic in the message pane; shows "No topic set" when absent |
 | Display name change | working | /nick <name> sets the user's global Matrix display name via profile API |
+| Emote sending | working | /me <action> sends m.emote type; renders as "* username action" in-line |
+| Date separators | working | Day-boundary separators (─── 2024-01-15 ───) shown between messages from different days |

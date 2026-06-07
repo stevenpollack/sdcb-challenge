@@ -255,6 +255,32 @@ async def test_send_message_failure_returns_none():
 
 
 # ------------------------------------------------------------------
+# send_emote
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_send_emote_returns_event_id():
+    client = make_client()
+    from nio import RoomSendResponse
+    with patch.object(client._client, "room_send", new_callable=AsyncMock) as mock_send:
+        mock_send.return_value = MagicMock(spec=RoomSendResponse, event_id="$emote")
+        result = await client.send_emote("!r:m.org", "waves hello")
+    assert result == "$emote"
+    _, kwargs = mock_send.call_args
+    assert kwargs["content"]["msgtype"] == "m.emote"
+    assert kwargs["content"]["body"] == "waves hello"
+
+
+@pytest.mark.asyncio
+async def test_send_emote_failure_returns_none():
+    client = make_client()
+    with patch.object(client._client, "room_send", new_callable=AsyncMock) as mock_send:
+        mock_send.return_value = object()
+        result = await client.send_emote("!r:m.org", "waves")
+    assert result is None
+
+
+# ------------------------------------------------------------------
 # send_read_receipt
 # ------------------------------------------------------------------
 

@@ -297,6 +297,9 @@ class MatrixApp(App):
             await self._handle_nick(name)
         elif text.startswith("/help"):
             self._handle_help()
+        elif text.startswith("/me "):
+            emote = text[4:].strip()
+            await self._handle_me(emote)
         elif self.current_room:
             await self._client.send_message(self.current_room, text)
 
@@ -329,6 +332,11 @@ class MatrixApp(App):
             ).strftime("%Y-%m-%d %H:%M")
             sender_short = msg.sender.split(":")[0].lstrip("@")
             log.write(f"[dim]{rname}[/dim] [{ts}] [bold]{sender_short}[/bold]: {msg.body}")
+
+    async def _handle_me(self, emote: str) -> None:
+        if not self.current_room or not emote:
+            return
+        await self._client.send_emote(self.current_room, emote)
 
     def _handle_topic(self) -> None:
         if not self.current_room:
@@ -370,6 +378,7 @@ class MatrixApp(App):
         log.write("  /members                List members of current room")
         log.write("  /topic                  Show the current room topic")
         log.write("  /nick <name>            Set your global display name")
+        log.write("  /me <action>            Send an emote (e.g. /me waves)")
 
     def _handle_members(self) -> None:
         if not self.current_room:
@@ -443,9 +452,16 @@ class MatrixApp(App):
         log = self.query_one("#messages", RichLog)
         log.clear()
         msgs = self._client.messages.get(room_id, [])
+        self._last_date: str = ""  # reset date-separator state
         for msg in msgs:
             self._append_message(msg)
         self.query_one("#msg-input", Input).focus()
+        # Zero unread count locally so badge clears immediately
+        if summary:
+            summary.unread_count = 0
+            item = self._room_items.get(room_id)
+            if item:
+                item.refresh_text()
         # Send read receipt for last message
         if msgs:
             self.run_worker(
@@ -455,7 +471,12 @@ class MatrixApp(App):
 
     def _append_message(self, msg: Message) -> None:
         log = self.query_one("#messages", RichLog)
-        ts = datetime.fromtimestamp(msg.timestamp / 1000, tz=timezone.utc).strftime("%H:%M")
+        dt = datetime.fromtimestamp(msg.timestamp / 1000, tz=timezone.utc)
+        date_str = dt.strftime("%Y-%m-%d")
+        if date_str != getattr(self, "_last_date", ""):
+            self._last_date = date_str
+            log.write(f"[dim]─── {date_str} ───[/dim]")
+        ts = dt.strftime("%H:%M")
         sender_short = msg.sender.split(":")[0].lstrip("@")
 
         if msg.mentions_me:
