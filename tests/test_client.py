@@ -598,6 +598,16 @@ async def test_join_room_swallows_exceptions():
 
 
 @pytest.mark.asyncio
+async def test_leave_room_swallows_exception():
+    client = make_client()
+    with patch.object(
+        client._client, "room_leave", new_callable=AsyncMock, side_effect=Exception("net")
+    ):
+        result = await client.leave_room("!r:m.org")
+    assert result is False
+
+
+@pytest.mark.asyncio
 async def test_leave_room_removes_from_state():
     client = make_client()
     client.rooms["!r:m.org"] = RoomSummary("!r:m.org", "Room")
@@ -610,3 +620,116 @@ async def test_leave_room_removes_from_state():
     assert result is True
     assert "!r:m.org" not in client.rooms
     assert "!r:m.org" not in client.messages
+
+
+# ------------------------------------------------------------------
+# search_messages
+# ------------------------------------------------------------------
+
+def test_search_messages_finds_by_body():
+    client = make_client()
+    client.messages["!r:m.org"] = [
+        Message("$1", "@a:m.org", "hello world", 1000),
+        Message("$2", "@b:m.org", "goodbye", 2000),
+    ]
+    results = client.search_messages("hello")
+    assert len(results) == 1
+    assert results[0][1].event_id == "$1"
+
+
+def test_search_messages_finds_by_sender():
+    client = make_client()
+    client.messages["!r:m.org"] = [
+        Message("$1", "@alice:m.org", "hi", 1000),
+        Message("$2", "@bob:m.org", "hey", 2000),
+    ]
+    results = client.search_messages("alice")
+    assert len(results) == 1
+    assert results[0][1].sender == "@alice:m.org"
+
+
+def test_search_messages_case_insensitive():
+    client = make_client()
+    client.messages["!r:m.org"] = [Message("$1", "@a:m.org", "Hello World", 1000)]
+    assert len(client.search_messages("hello world")) == 1
+    assert len(client.search_messages("HELLO")) == 1
+
+
+def test_search_messages_across_all_rooms():
+    client = make_client()
+    client.messages["!r1:m.org"] = [Message("$1", "@a:m.org", "ping", 1000)]
+    client.messages["!r2:m.org"] = [Message("$2", "@b:m.org", "ping pong", 2000)]
+    results = client.search_messages("ping")
+    assert len(results) == 2
+
+
+def test_search_messages_restricted_to_room():
+    client = make_client()
+    client.messages["!r1:m.org"] = [Message("$1", "@a:m.org", "ping", 1000)]
+    client.messages["!r2:m.org"] = [Message("$2", "@b:m.org", "ping pong", 2000)]
+    results = client.search_messages("ping", room_id="!r1:m.org")
+    assert len(results) == 1
+    assert results[0][0] == "!r1:m.org"
+
+
+def test_search_messages_empty_result():
+    client = make_client()
+    client.messages["!r:m.org"] = [Message("$1", "@a:m.org", "hello", 1000)]
+    assert client.search_messages("zzznomatch") == []
+
+
+def test_search_messages_sorted_by_timestamp():
+    client = make_client()
+    client.messages["!r:m.org"] = [
+        Message("$2", "@a:m.org", "match", 2000),
+        Message("$1", "@a:m.org", "match", 1000),
+    ]
+    results = client.search_messages("match")
+    assert results[0][1].event_id == "$1"
+    assert results[1][1].event_id == "$2"
+
+
+# ------------------------------------------------------------------
+# get_room_members
+# ------------------------------------------------------------------
+
+def test_get_room_members_returns_user_ids():
+    client = make_client()
+    nio_room = MagicMock()
+    nio_room.users = {"@alice:m.org": MagicMock(), "@bob:m.org": MagicMock()}
+    client._client.rooms = {"!r:m.org": nio_room}
+    members = client.get_room_members("!r:m.org")
+    assert set(members) == {"@alice:m.org", "@bob:m.org"}
+
+
+def test_get_room_members_unknown_room():
+    client = make_client()
+    client._client.rooms = {}
+    assert client.get_room_members("!unknown:m.org") == []
+
+
+# ------------------------------------------------------------------
+# start_sync + login paths
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_login_raises_on_error():
+    client = make_client()
+    with patch.object(client._client, "login", new_callable=AsyncMock) as mock_login:
+        mock_login.return_value = object()  # not LoginResponse
+        with pytest.raises(RuntimeError, match="Login failed"):
+            await client.login("badpassword")
+
+
+@pytest.mark.asyncio
+async def test_start_sync_calls_sync_and_starts_task():
+    client = make_client()
+    from nio import SyncResponse
+    mock_resp = MagicMock(spec=SyncResponse)
+    with patch.object(client._client, "sync", new_callable=AsyncMock) as mock_sync:
+        mock_sync.return_value = mock_resp
+        client._client.rooms = {}
+        await client.start_sync()
+    assert client._running is True
+    assert client._sync_task is not None
+    client._sync_task.cancel()  # cleanup
