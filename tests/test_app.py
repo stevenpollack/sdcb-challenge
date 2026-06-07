@@ -1166,3 +1166,30 @@ async def test_kick_no_room_noop():
         await asyncio.ensure_future(app._handle_kick("@alice:m.org"))
         await pilot.pause(0.1)
         client.kick_user.assert_not_called()
+
+
+# ------------------------------------------------------------------
+# End-to-end sync wiring: _on_room_message callback → UI
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_sync_callback_delivers_message_to_active_room():
+    """Message arriving via client._on_message callback appears in open room pane."""
+    app, client = make_app()
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView, RichLog
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        log = app.query_one("#messages", RichLog)
+        before = len(log.lines)
+        # Simulate what _on_room_message does after dedup check
+        live_msg = Message("$synced", "@bob:m.org", "synced body", 1700000005000)
+        client.messages["!r1:m.org"].append(live_msg)
+        for cb in client._on_message:
+            cb("!r1:m.org", live_msg)
+        await pilot.pause(0.2)
+        assert len(log.lines) > before
+        assert any("synced body" in str(line) for line in log.lines)
