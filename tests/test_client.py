@@ -1606,3 +1606,86 @@ async def test_rename_room_exception_returns_false():
     client = make_client()
     client._client.room_put_state = AsyncMock(side_effect=Exception("network"))
     assert await client.rename_room("!r:m.org", "New Name") is False
+
+
+# ------------------------------------------------------------------
+# forget_room / set_room_alias / get_presence
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_forget_room_success():
+    from nio import RoomForgetResponse
+    client = make_client()
+    client._client.room_forget = AsyncMock(return_value=RoomForgetResponse("!r:m.org"))
+    assert await client.forget_room("!r:m.org") is True
+
+
+@pytest.mark.asyncio
+async def test_forget_room_failure_returns_false():
+    from nio import RoomForgetError
+    client = make_client()
+    client._client.room_forget = AsyncMock(return_value=RoomForgetError("not_left"))
+    assert await client.forget_room("!r:m.org") is False
+
+
+@pytest.mark.asyncio
+async def test_forget_room_exception_returns_false():
+    client = make_client()
+    client._client.room_forget = AsyncMock(side_effect=Exception("network"))
+    assert await client.forget_room("!r:m.org") is False
+
+
+@pytest.mark.asyncio
+async def test_set_room_alias_success():
+    from nio import RoomPutAliasResponse
+    client = make_client()
+    client._client.room_put_alias = AsyncMock(
+        return_value=RoomPutAliasResponse("#test:m.org", "!r:m.org")
+    )
+    assert await client.set_room_alias("!r:m.org", "#test:m.org") is True
+    client._client.room_put_alias.assert_called_once_with("#test:m.org", "!r:m.org")
+
+
+@pytest.mark.asyncio
+async def test_set_room_alias_failure_returns_false():
+    # No dedicated error type in this nio version — return a non-Response object
+    client = make_client()
+    client._client.room_put_alias = AsyncMock(return_value=MagicMock(spec=[]))
+    assert await client.set_room_alias("!r:m.org", "#test:m.org") is False
+
+
+@pytest.mark.asyncio
+async def test_set_room_alias_exception_returns_false():
+    client = make_client()
+    client._client.room_put_alias = AsyncMock(side_effect=Exception("network"))
+    assert await client.set_room_alias("!r:m.org", "#test:m.org") is False
+
+
+@pytest.mark.asyncio
+async def test_get_presence_success():
+    from nio import PresenceGetResponse
+    client = make_client()
+    client._client.get_presence = AsyncMock(
+        return_value=PresenceGetResponse("@bob:m.org", "online", 5000, True, "In a meeting")
+    )
+    info = await client.get_presence("@bob:m.org")
+    assert info is not None
+    assert info["presence"] == "online"
+    assert info["status_msg"] == "In a meeting"
+    assert info["last_active_ago"] == 5000
+    assert info["currently_active"] is True
+
+
+@pytest.mark.asyncio
+async def test_get_presence_failure_returns_none():
+    from nio import PresenceGetError
+    client = make_client()
+    client._client.get_presence = AsyncMock(return_value=PresenceGetError("forbidden"))
+    assert await client.get_presence("@bob:m.org") is None
+
+
+@pytest.mark.asyncio
+async def test_get_presence_exception_returns_none():
+    client = make_client()
+    client._client.get_presence = AsyncMock(side_effect=Exception("network"))
+    assert await client.get_presence("@bob:m.org") is None

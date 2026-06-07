@@ -1709,3 +1709,92 @@ async def test_next_unread_noop_when_all_read():
         app.action_next_unread()
         await pilot.pause(0.1)
         assert app.current_room is None
+
+
+# ------------------------------------------------------------------
+# /forget, /alias, /getpresence handlers
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_forget_removes_room_from_ui():
+    app, client = make_app()
+    client.forget_room = AsyncMock(return_value=True)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView, Static
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        assert app.current_room == "!r1:m.org"
+        import asyncio
+        await asyncio.ensure_future(app._handle_forget())
+        await pilot.pause(0.2)
+        assert app.current_room is None
+        assert "!r1:m.org" not in app._room_items
+        assert "Room forgotten" in str(app.query_one("#status-bar", Static).content)
+
+
+@pytest.mark.asyncio
+async def test_forget_failure_shows_hint():
+    app, client = make_app()
+    client.forget_room = AsyncMock(return_value=False)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView, Static
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        import asyncio
+        await asyncio.ensure_future(app._handle_forget())
+        await pilot.pause(0.1)
+        assert "leave first" in str(app.query_one("#status-bar", Static).content).lower()
+
+
+@pytest.mark.asyncio
+async def test_alias_success():
+    app, client = make_app()
+    client.set_room_alias = AsyncMock(return_value=True)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView, Static
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        import asyncio
+        await asyncio.ensure_future(app._handle_alias("#cool:m.org"))
+        await pilot.pause(0.1)
+        assert "Alias" in str(app.query_one("#status-bar", Static).content)
+
+
+@pytest.mark.asyncio
+async def test_getpresence_shows_info():
+    app, client = make_app()
+    client.get_presence = AsyncMock(return_value={
+        "presence": "online", "status_msg": "coding", "last_active_ago": 3000,
+        "currently_active": True,
+    })
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import RichLog
+        log = app.query_one("#messages", RichLog)
+        import asyncio
+        await asyncio.ensure_future(app._handle_getpresence("@bob:m.org"))
+        await pilot.pause(0.1)
+        assert any("online" in str(line) for line in log.lines)
+
+
+@pytest.mark.asyncio
+async def test_getpresence_not_found_shows_dim():
+    app, client = make_app()
+    client.get_presence = AsyncMock(return_value=None)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import RichLog
+        log = app.query_one("#messages", RichLog)
+        import asyncio
+        await asyncio.ensure_future(app._handle_getpresence("@ghost:m.org"))
+        await pilot.pause(0.1)
+        assert any("Could not fetch" in str(line) for line in log.lines)

@@ -49,3 +49,6 @@ more heavily than an accurate `partial` or `broken`.
 | Presence control | working | /presence online|offline|unavailable sets global Matrix presence |
 | Rename room | working | /rename <name> updates current room's m.room.name state event |
 | Jump to next unread | working | Ctrl+N jumps to the next room with unread messages, skipping the current room |
+| Forget room | working | /forget removes a previously left room from server history; clears it from the sidebar |
+| Room alias management | working | /alias #alias:srv publishes a local alias for the current room via Matrix API |
+| User presence lookup | working | /getpresence <@user> fetches and displays online/offline status and status message |

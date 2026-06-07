@@ -348,6 +348,14 @@ class MatrixApp(App):
         elif text.startswith("/rename "):
             name = text[8:].strip()
             await self._handle_rename(name)
+        elif text == "/forget":
+            await self._handle_forget()
+        elif text.startswith("/alias "):
+            alias = text[7:].strip()
+            await self._handle_alias(alias)
+        elif text.startswith("/getpresence "):
+            target = text[13:].strip()
+            await self._handle_getpresence(target)
         elif text == "/clear":
             self._handle_clear()
         elif self.current_room:
@@ -448,6 +456,44 @@ class MatrixApp(App):
         self.query_one("#status-bar", Static).update(
             f"Presence set to {state}" if ok else "Failed to set presence"
         )
+
+    async def _handle_forget(self) -> None:
+        if not self.current_room:
+            return
+        room_id = self.current_room
+        status = self.query_one("#status-bar", Static)
+        ok = await self._client.forget_room(room_id)
+        if ok:
+            item = self._room_items.pop(room_id, None)
+            if item:
+                await item.remove()
+            self.current_room = None
+            self.query_one("#room-title", Static).update("Select a room")
+            self.query_one("#messages", RichLog).clear()
+            status.update("Room forgotten")
+        else:
+            status.update("Failed to forget room (leave first with /leave)")
+
+    async def _handle_alias(self, alias: str) -> None:
+        if not self.current_room or not alias:
+            return
+        status = self.query_one("#status-bar", Static)
+        ok = await self._client.set_room_alias(self.current_room, alias)
+        status.update(f"Alias {alias} set" if ok else f"Failed to set alias {alias}")
+
+    async def _handle_getpresence(self, user_id: str) -> None:
+        if not user_id:
+            return
+        log = self.query_one("#messages", RichLog)
+        info = await self._client.get_presence(user_id)
+        if info is None:
+            log.write(f"[dim]Could not fetch presence for {user_id}[/dim]")
+            return
+        p = info.get("presence", "unknown")
+        msg = info.get("status_msg") or ""
+        ago = info.get("last_active_ago")
+        ago_str = f", last active {ago // 1000}s ago" if ago is not None else ""
+        log.write(f"[bold]{user_id}[/bold]: {p}{ago_str}" + (f" — {msg}" if msg else ""))
 
     async def _handle_rename(self, name: str) -> None:
         if not self.current_room or not name:
@@ -579,6 +625,9 @@ class MatrixApp(App):
         log.write("  /dm <@user:srv>         Open a direct message room with a user")
         log.write("  /presence <state>       Set presence: online, offline, unavailable")
         log.write("  /rename <name>          Rename the current room")
+        log.write("  /forget                 Forget a previously left room")
+        log.write("  /alias #alias:srv       Publish a local alias for the current room")
+        log.write("  /getpresence <@user>    Show a user's presence status")
         log.write("  /logout                 Log out and clear saved session")
         log.write("  /create <name>          Create a new room with the given name")
         log.write("  /settopic <text>        Set the topic for the current room")

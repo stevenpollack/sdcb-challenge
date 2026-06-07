@@ -14,11 +14,14 @@ from nio import (
     LoginResponse,
     MatrixRoom,
     MessageDirection,
+    PresenceGetResponse,
     PresenceSetResponse,
     RoomBanResponse,
     RoomCreateResponse,
+    RoomForgetResponse,
     RoomInviteResponse,
     RoomKickResponse,
+    RoomPutAliasResponse,
     RoomMessage,
     RoomMessageAudio,
     RoomMessageEmote,
@@ -545,6 +548,42 @@ class MatrixClient:
         except Exception as exc:
             logger.warning("set_presence error: %s", exc)
         return False
+
+    async def forget_room(self, room_id: str) -> bool:
+        """Forget a previously left room, removing it from the server-side history.
+
+        The room must be left first. Returns True on success.
+        """
+        try:
+            resp = await self._client.room_forget(room_id)
+            return isinstance(resp, RoomForgetResponse)
+        except Exception as exc:
+            logger.warning("forget_room error: %s", exc)
+        return False
+
+    async def set_room_alias(self, room_id: str, alias: str) -> bool:
+        """Publish a local alias for room_id (e.g. '#my-room:server'). Returns True on success."""
+        try:
+            resp = await self._client.room_put_alias(alias, room_id)
+            return isinstance(resp, RoomPutAliasResponse)
+        except Exception as exc:
+            logger.warning("set_room_alias error: %s", exc)
+        return False
+
+    async def get_presence(self, user_id: str) -> dict | None:
+        """Fetch presence info for a user. Returns dict with 'presence', 'status_msg', etc."""
+        try:
+            resp = await self._client.get_presence(user_id)
+            if isinstance(resp, PresenceGetResponse):
+                return {
+                    "presence": resp.presence,
+                    "status_msg": resp.status_msg,
+                    "last_active_ago": resp.last_active_ago,
+                    "currently_active": resp.currently_active,
+                }
+        except Exception as exc:
+            logger.warning("get_presence error: %s", exc)
+        return None
 
     async def rename_room(self, room_id: str, name: str) -> bool:
         """Set the display name of a room via m.room.name state event."""
