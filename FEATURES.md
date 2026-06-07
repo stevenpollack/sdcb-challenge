@@ -25,3 +25,5 @@ more heavily than an accurate `partial` or `broken`.
 | Room leave via slash command | working | /leave leaves current room, removes from sidebar and clears pane |
 | Message search | working | /search <query> searches all loaded messages by body or sender, shows results in pane |
 | Room member list | working | /members lists all current members of the active room |
+| Mention highlighting | working | Messages containing local username shown with bold red background |
+| In-app help | working | /help displays all keybindings and slash commands in the message pane |
