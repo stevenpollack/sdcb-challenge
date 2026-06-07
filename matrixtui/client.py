@@ -9,9 +9,12 @@ from typing import Callable
 from nio import (
     AsyncClient,
     AsyncClientConfig,
+    JoinResponse,
     LoginResponse,
     MatrixRoom,
     MessageDirection,
+    RedactedEvent,
+    RedactionEvent,
     RoomMessage,
     RoomMessageAudio,
     RoomMessageEmote,
@@ -25,6 +28,7 @@ from nio import (
     RoomSendResponse,
     SyncResponse,
     TypingNoticeEvent,
+    UnknownEvent,
 )
 
 logger = logging.getLogger(__name__)
@@ -77,6 +81,8 @@ class MatrixClient:
         self._client.add_event_callback(self._on_room_message, RoomMessage)
         self._client.add_event_callback(self._on_room_name, RoomNameEvent)
         self._client.add_event_callback(self._on_typing_notice, TypingNoticeEvent)
+        self._client.add_event_callback(self._on_redaction, RedactionEvent)
+        self._client.add_event_callback(self._on_unknown_event, UnknownEvent)
 
     # ------------------------------------------------------------------
     # Auth
@@ -182,6 +188,36 @@ class MatrixClient:
         for cb in self._on_typing:
             cb(room.room_id, self.typing_users[room.room_id])
 
+    async def _on_redaction(self, room: MatrixRoom, event: RedactionEvent) -> None:
+        """Mark a redacted message in-place so it shows as [redacted]."""
+        msgs = self.messages.get(room.room_id, [])
+        for msg in msgs:
+            if msg.event_id == event.redacts:
+                msg.body = "[redacted]"
+                msg.msgtype = "m.redacted"
+                break
+        for cb in self._on_room_update:
+            cb(room.room_id)
+
+    async def _on_unknown_event(self, room: MatrixRoom, event: UnknownEvent) -> None:
+        """Handle m.room.message edits (m.replace relationship)."""
+        if event.type != "m.room.message":
+            return
+        content = getattr(event, "source", {}).get("content", {})
+        relates = content.get("m.relates_to", {})
+        if relates.get("rel_type") != "m.replace":
+            return
+        new_content = content.get("m.new_content", {})
+        new_body = new_content.get("body", "")
+        replaces_id = relates.get("event_id")
+        msgs = self.messages.get(room.room_id, [])
+        for msg in msgs:
+            if msg.event_id == replaces_id:
+                msg.body = f"{new_body} [edited]"
+                break
+        for cb in self._on_room_update:
+            cb(room.room_id)
+
     # ------------------------------------------------------------------
     # Messaging
     # ------------------------------------------------------------------
@@ -206,6 +242,30 @@ class MatrixClient:
             )
         except Exception as exc:
             logger.debug("Failed to send read receipt: %s", exc)
+
+    async def join_room(self, room_id_or_alias: str) -> str | None:
+        """Join a room by ID or alias. Returns the resolved room_id on success."""
+        try:
+            resp = await self._client.join(room_id_or_alias)
+            if isinstance(resp, JoinResponse):
+                return resp.room_id
+            logger.warning("join failed: %s", resp)
+        except Exception as exc:
+            logger.warning("join_room error: %s", exc)
+        return None
+
+    async def leave_room(self, room_id: str) -> bool:
+        """Leave a room. Returns True on success."""
+        try:
+            resp = await self._client.room_leave(room_id)
+            # RoomLeaveResponse has no error attribute on success
+            if hasattr(resp, "transport_response") or not hasattr(resp, "message"):
+                self.rooms.pop(room_id, None)
+                self.messages.pop(room_id, None)
+                return True
+        except Exception as exc:
+            logger.warning("leave_room error: %s", exc)
+        return False
 
     async def load_history(self, room_id: str, limit: int = 50) -> list[Message]:
         """Load older messages for a room via /messages."""
