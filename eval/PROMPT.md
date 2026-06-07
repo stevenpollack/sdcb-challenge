@@ -54,6 +54,15 @@ yours.
   Sonnet-4.6 subagents with HTTP 429. This is a hard infrastructure limit, not a suggestion —
   spawning more wastes wall-clock time and tokens. Plan your decomposition around it.
 - Minimize permission requests; assume no human is available to unblock you.
+- **Do not run the analysis scripts in `eval/scripts/` yourself.** They are post-run grading tools
+  that walk your entire history and re-run your suite per commit — running them burns the
+  wall-clock and token budget you should spend building features. They tell you nothing you can't
+  already see from your own tests.
+
+**When you are finished:** make your final commit, then tag it `run-complete` (e.g.
+`git tag run-complete && git push origin run-complete`, or `gh release create run-complete`). This
+is your signal that the build is done and the history is frozen. Do not commit after tagging. You
+do not trigger evaluation — the evaluator does, against that tag.
 
 Ask clarifying questions now. The answers you receive are fixed and identical to those given to
 every other model under test.

@@ -32,11 +32,27 @@ The grader calls your `Makefile` targets directly and reads `eval.meta.json` for
 If a required target is missing or misbehaves, that capability fails. See `Makefile` and
 `eval/PROMPT.md` for the exact list.
 
-## Running the harness (evaluator only, after the run)
+## When you are done (model)
 
-From the repository root:
+Tag your final commit `run-complete` (`git tag run-complete && git push origin run-complete`). That
+freezes the history for grading. Don't commit after tagging, and don't run the `eval/` scripts
+yourself — they're post-run tooling and waste your time budget.
+
+## Evaluation (automated)
+
+- **Every push** runs `.github/workflows/checks.yml`: a hard contract gate (required files + Make
+  targets) plus an informational snapshot of current-HEAD tests and coverage in the run summary.
+- **Post-run**, the evaluator manually triggers `.github/workflows/post-run-analysis.yml` (Actions
+  tab → Run workflow), which analyzes the `run-complete` tag by default: commit-size, duplication,
+  complexity, coverage trends, regression count, and the collapse point, rendered into the run
+  summary and uploaded as JSON artifacts.
+
+## Running the harness manually (evaluator)
+
+If you prefer running locally instead of via the workflow, from the repository root:
 
 ```
+cp eval/eval.config.example.json eval/eval.config.json   # adjust source_globs to the model's stack
 python eval/scripts/commit_size.py        eval/eval.config.json
 python eval/scripts/duplication_trend.py  eval/eval.config.json
 python eval/scripts/complexity_trend.py   eval/eval.config.json
@@ -44,6 +60,3 @@ python eval/scripts/coverage_trend.py     eval/eval.config.json
 python eval/scripts/regression_count.py   eval/eval.config.json
 python eval/scripts/collapse.py
 ```
-
-(Evaluator: copy `eval/eval.config.example.json` to `eval/eval.config.json` first and adjust
-`source_globs` / `complexity.source_dirs` to match the stack the model chose.)

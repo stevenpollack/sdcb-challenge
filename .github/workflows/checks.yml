@@ -1,0 +1,128 @@
+name: checks
+# Per-push, point-in-time checks against the pushed commit only (no history walk, so it's fast).
+# Two parts:
+#   1. contract  — HARD GATE: required files + Makefile targets must exist (fails the run if not).
+#   2. snapshot  — INFORMATIONAL: current-HEAD test + coverage, rendered into the run summary.
+#                  Never fails the build; a stub or pre-implementation push just reports "n/a".
+# Whole-history trend/collapse analysis is intentionally NOT here — see post-run-analysis.yml.
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Required files present
+        run: |
+          set -e
+          for f in Makefile eval.meta.json FEATURES.md README.md; do
+            test -f "$f" || { echo "::error::missing required file: $f"; exit 1; }
+          done
+      - name: Makefile targets defined
+        run: |
+          set -e
+          for t in setup run test coverage test-report lint; do
+            make -n "$t" >/dev/null 2>&1 || { echo "::error::missing/undefined make target: $t"; exit 1; }
+          done
+          echo "all required targets defined"
+      - name: eval.meta.json valid with required keys
+        run: |
+          python3 - <<'PY'
+          import json
+          m=json.load(open("eval.meta.json"))
+          for k in ("coverage_report","coverage_format","junit_report"):
+              assert k in m, f"eval.meta.json missing key: {k}"
+          print("eval.meta.json OK")
+          PY
+
+  snapshot:
+    runs-on: ubuntu-latest
+    needs: contract
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up runtimes (best-effort)
+        # The model chooses its own stack; provide the common ones so `make setup` can work.
+        run: |
+          echo "node: $(node -v 2>/dev/null || echo none)"
+          echo "python: $(python3 -V 2>/dev/null || echo none)"
+
+      - name: make setup (best-effort)
+        id: setup
+        continue-on-error: true
+        run: make setup
+
+      - name: make test-report (current HEAD)
+        id: testrep
+        continue-on-error: true
+        run: make test-report
+
+      - name: make coverage (current HEAD)
+        id: cov
+        continue-on-error: true
+        run: make coverage
+
+      - name: Render summary
+        if: always()
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, os, glob
+          import xml.etree.ElementTree as ET
+
+          print("## Snapshot @ current commit\n")
+          print(f"- commit: `{os.environ.get('GITHUB_SHA','')[:8]}`")
+
+          # report paths come from the model's eval.meta.json
+          meta = {}
+          try:
+              meta = json.load(open("eval.meta.json"))
+          except Exception:
+              pass
+
+          # --- JUnit summary ---
+          junit = meta.get("junit_report", "junit.xml")
+          passed = failed = errored = 0
+          found = False
+          for path in {junit, "junit.xml", *glob.glob("**/junit*.xml", recursive=True)}:
+              if path and os.path.exists(path):
+                  found = True
+                  try:
+                      for tc in ET.parse(path).iter("testcase"):
+                          if any(c.tag in ("failure","error") for c in tc):
+                              failed += 1
+                          else:
+                              passed += 1
+                  except ET.ParseError:
+                      pass
+                  break
+          print("\n### Tests")
+          if found:
+              total = passed + failed
+              print(f"- {passed}/{total} passing" + (f", **{failed} failing**" if failed else ""))
+          else:
+              print("- n/a (no JUnit report; `make test-report` not implemented yet)")
+
+          # --- Coverage summary ---
+          cov_report = meta.get("coverage_report", "coverage-summary.json")
+          fmt = meta.get("coverage_format", "jest-json-summary")
+          pct = None
+          try:
+              if fmt == "jest-json-summary" and os.path.exists(cov_report):
+                  pct = json.load(open(cov_report))["total"]["lines"]["pct"]
+              elif fmt == "coverage-py-json" and os.path.exists(cov_report):
+                  pct = json.load(open(cov_report))["totals"]["percent_covered"]
+              elif fmt == "cobertura-xml" and os.path.exists(cov_report):
+                  pct = float(ET.parse(cov_report).getroot().attrib["line-rate"]) * 100
+              elif fmt == "lcov" and os.path.exists(cov_report):
+                  hit = found_l = 0
+                  for line in open(cov_report):
+                      if line.startswith("LH:"): hit += int(line[3:])
+                      elif line.startswith("LF:"): found_l += int(line[3:])
+                  pct = (hit / found_l * 100) if found_l else None
+          except Exception:
+              pct = None
+          print("\n### Coverage")
+          print(f"- {pct:.1f}% lines" if pct is not None
+                else "- n/a (no coverage report; `make coverage` not implemented yet)")
+          print("\n_Informational only. Whole-history trends run post-run; see post-run-analysis.yml._")
+          PY

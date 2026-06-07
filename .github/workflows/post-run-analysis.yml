@@ -1,0 +1,113 @@
+name: post-run-analysis
+# Whole-history trend + collapse analysis. Expensive (walks every feature commit, re-runs
+# `make coverage` per commit), so it is MANUAL ONLY and runs against a frozen ref.
+#
+# Trigger: Actions tab -> post-run-analysis -> Run workflow. The evaluator triggers this, not the
+# model. The model signals completion by tagging `run-complete`; this workflow inspects that tag
+# by default. Override `ref` to analyze a different tag/branch/SHA.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref (tag/branch/SHA) to analyze. The model tags this when done."
+        required: true
+        default: "run-complete"
+
+jobs:
+  analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history at ${{ inputs.ref }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0          # trend scripts walk the whole history; shallow would break them
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install analysis tools
+        run: |
+          pip install lizard
+          npm i -g jscpd
+
+      - name: Set up runtimes for per-commit coverage (best-effort)
+        run: |
+          echo "node: $(node -v 2>/dev/null || echo none)"
+          echo "python: $(python3 -V 2>/dev/null || echo none)"
+
+      # Cache the package manager dir so per-commit `make setup`/`make coverage` reruns don't
+      # reinstall from scratch every commit. Keyed broadly since lockfiles change across history.
+      - name: Cache deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            ~/.cache/pip
+            node_modules
+          key: postrun-deps-${{ inputs.ref }}
+          restore-keys: postrun-deps-
+
+      - name: Prepare eval config
+        run: |
+          cp eval/eval.config.example.json eval/eval.config.json
+          echo "Using default eval.config.json. If the model's stack puts source outside src/,"
+          echo "the evaluator should edit source_globs / complexity.source_dirs and re-run."
+
+      - name: Run objective trend scripts
+        run: |
+          set +e   # individual scripts may partially fail (e.g. a commit whose suite errors); keep going
+          python eval/scripts/commit_size.py        eval/eval.config.json
+          python eval/scripts/duplication_trend.py  eval/eval.config.json
+          python eval/scripts/complexity_trend.py   eval/eval.config.json
+          python eval/scripts/coverage_trend.py     eval/eval.config.json
+          python eval/scripts/regression_count.py   eval/eval.config.json
+          python eval/scripts/collapse.py
+          true
+
+      - name: Render analysis into summary
+        if: always()
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, os
+          ref = os.environ.get("INPUT_REF") or "run-complete"
+          print(f"# Post-run analysis @ `{ref}`\n")
+
+          def load(p):
+              try: return json.load(open(p))
+              except Exception: return None
+
+          coll = load("collapse.json")
+          reg  = load("regression_count.json")
+          cov  = load("coverage_trend.json")
+
+          print("## Headline\n")
+          if coll and coll.get("collapse_index") is not None:
+              print(f"- **Collapse point:** feature index {coll['collapse_index']}")
+          elif coll:
+              print("- **Collapse point:** none detected (no two consecutive rot-onset commits)")
+          else:
+              print("- **Collapse point:** n/a (collapse.json not produced)")
+          if reg: print(f"- **Total regressions introduced:** {reg.get('total_regressions','?')}")
+          if cov: print(f"- **Peak coverage:** {cov.get('max','?')}%")
+          print("\n_Collapse thresholds are provisional placeholders — recalibrate against this"
+                " history before treating the collapse index as a finding (see eval/EVALUATION.md)._")
+
+          # attach raw artifacts list
+          print("\n## Artifacts produced")
+          for f in ("commit_size.json","duplication_trend.json","complexity_trend.json",
+                    "coverage_trend.json","regression_count.json","collapse.json"):
+              print(f"- `{f}`" + ("" if os.path.exists(f) else "  _(missing)_"))
+          PY
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+
+      - name: Upload analysis artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: analysis-${{ inputs.ref }}
+          path: |
+            *.json
+          if-no-files-found: warn
