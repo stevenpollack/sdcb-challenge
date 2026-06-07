@@ -27,3 +27,4 @@ more heavily than an accurate `partial` or `broken`.
 | Room member list | working | /members lists all current members of the active room |
 | Mention highlighting | working | Messages containing local username shown with bold red background |
 | In-app help | working | /help displays all keybindings and slash commands in the message pane |
+| Session persistence | working | Login token saved to ~/.config/matrixtui/session.json (mode 0o600); restored on next start |
