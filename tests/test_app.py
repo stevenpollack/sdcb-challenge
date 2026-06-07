@@ -781,6 +781,87 @@ async def test_ctrl_r_noop_when_no_room():
 
 
 # ------------------------------------------------------------------
+# _connect error path
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_connect_error_shown_in_status_bar():
+    """If _connect() login raises, the except branch updates the status bar."""
+    with patch("matrixtui.client.AsyncClient"):
+        client = MatrixClient("https://matrix.org", "@test:matrix.org")
+    client.login = AsyncMock(side_effect=RuntimeError("bad credentials"))
+    client.logout = AsyncMock()
+    client._client.close = AsyncMock()
+
+    app = MatrixApp(client)
+
+    import os
+    env = {
+        "MATRIX_HOMESERVER": "https://matrix.org",
+        "MATRIX_USER": "@test:matrix.org",
+        "MATRIX_PASSWORD": "pw",
+    }
+    with patch.dict(os.environ, env):
+        with patch("matrixtui.app.Config.from_env") as mock_cfg:
+            mock_cfg.return_value.password = "pw"
+            async with app.run_test(size=(120, 35)) as pilot:
+                await pilot.pause(0.5)
+                from textual.widgets import Static
+                status = app.query_one("#status-bar", Static)
+                assert "Error" in _static_text(status)
+                assert "bad credentials" in _static_text(status)
+
+
+@pytest.mark.asyncio
+async def test_connect_uses_real_login_path():
+    """_connect() calls client.login() and start_sync(), then rebuild list."""
+    with patch("matrixtui.client.AsyncClient"):
+        client = MatrixClient("https://matrix.org", "@test:matrix.org")
+    client.login = AsyncMock()
+    client.start_sync = AsyncMock()
+    client.logout = AsyncMock()
+    client._client.close = AsyncMock()
+    client.rooms = {
+        "!r1:m.org": RoomSummary("!r1:m.org", "Room", last_ts=1000, member_count=2),
+    }
+    client.messages = {"!r1:m.org": []}
+    client._client.rooms = {"!r1:m.org": MagicMock(users={}, topic=None)}
+
+    app = MatrixApp(client)
+    # Do NOT override _connect — use the real one
+
+    import os
+    env = {
+        "MATRIX_HOMESERVER": "https://matrix.org",
+        "MATRIX_USER": "@test:matrix.org",
+        "MATRIX_PASSWORD": "pw",
+    }
+    with patch.dict(os.environ, env):
+        with patch("matrixtui.app.Config.from_env") as mock_cfg:
+            mock_cfg.return_value.password = "pw"
+            async with app.run_test(size=(120, 35)) as pilot:
+                await pilot.pause(0.5)
+
+    client.login.assert_called_once_with("pw")
+    client.start_sync.assert_called_once()
+
+
+# ------------------------------------------------------------------
+# action_quit
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_action_quit_calls_logout():
+    app, client = make_app()
+    client.logout = AsyncMock()
+    client._client.close = AsyncMock()
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        await app.action_quit()
+    client.logout.assert_called_once()
+
+
+# ------------------------------------------------------------------
 # Edge-case guard clauses
 # ------------------------------------------------------------------
 
