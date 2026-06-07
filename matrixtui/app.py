@@ -173,7 +173,7 @@ class MatrixApp(App):
                 yield RichLog(id="messages", highlight=True, markup=True, wrap=True)
                 yield Static("", id="typing-indicator")
                 with Horizontal(id="input-bar"):
-                    yield Input(placeholder="Type a message…", id="msg-input")
+                    yield Input(placeholder="Message or /help for commands…", id="msg-input")
         yield Static("Connecting…", id="status-bar")
         yield Footer()
 
@@ -182,7 +182,21 @@ class MatrixApp(App):
         self._client.on_message(self._schedule_new_message)
         self._client.on_typing(self._schedule_typing_update)
         self._client.on_invite(self._schedule_invite)
+        self._show_welcome()
         self.run_worker(self._connect(), exclusive=True, name="matrix-sync")
+
+    def _show_welcome(self) -> None:
+        log = self.query_one("#messages", RichLog)
+        log.write("[bold]matrixtui[/bold] — Matrix TUI client")
+        log.write("")
+        log.write("  Select a room from the sidebar to start chatting.")
+        log.write("")
+        log.write("[bold]Quick reference:[/bold]")
+        log.write("  [dim]/help[/dim]          Show all commands and keybindings")
+        log.write("  [dim]/join #room:srv[/dim] Join a room")
+        log.write("  [dim]/search <query>[/dim] Search messages")
+        log.write("  [dim]Ctrl+F[/dim]          Filter rooms  [dim]Ctrl+R[/dim] Load history")
+        log.write("")
 
     async def _connect(self) -> None:
         try:

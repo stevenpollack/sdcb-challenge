@@ -129,6 +129,18 @@ def test_invite_received_message():
 # ------------------------------------------------------------------
 
 @pytest.mark.asyncio
+async def test_welcome_message_shown_on_mount():
+    """Welcome/hint text is shown in the log pane before any room is selected."""
+    app, client = make_app()
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import RichLog
+        log = app.query_one("#messages", RichLog)
+        # Should have the welcome content visible immediately
+        assert log.lines
+
+
+@pytest.mark.asyncio
 async def test_app_renders_room_list():
     app, client = make_app()
     async with app.run_test(size=(120, 35)) as pilot:

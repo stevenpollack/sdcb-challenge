@@ -12,6 +12,7 @@ import os
 
 import pytest
 
+from matrixtui.app import MatrixApp
 from matrixtui.client import MatrixClient
 from matrixtui.config import Config
 
@@ -101,3 +102,44 @@ def test_send_message_returns_event_id():
         "send_message should return an event_id from at least one room"
     )
     assert event_id.startswith("$"), f"Unexpected event_id format: {event_id}"
+
+
+@pytest.mark.asyncio
+async def test_app_connects_and_shows_rooms():
+    """E2E: MatrixApp starts, logs in, syncs, and renders the room list.
+
+    This test exercises the full _connect() code path against a live homeserver,
+    verifying that the TUI actually becomes usable after startup.
+    """
+    if not _has_credentials():
+        pytest.skip("No Matrix credentials in environment")
+
+    cfg = Config.from_env()
+    client = MatrixClient(cfg.homeserver, cfg.user_id)
+
+    app = MatrixApp(client)
+
+    async with app.run_test(size=(120, 35)) as pilot:
+        # Allow time for login + initial sync (up to 15s)
+        for _ in range(30):
+            await pilot.pause(0.5)
+            from textual.widgets import Static
+            status_text = str(app.query_one("#status-bar", Static).content)
+            if "Connected" in status_text or "Error" in status_text:
+                break
+
+        from textual.widgets import Static
+        status_text = str(app.query_one("#status-bar", Static).content)
+        assert "Connected" in status_text, (
+            f"Expected 'Connected' in status bar, got: {status_text!r}"
+        )
+
+        # Room list must be populated after a real sync
+        assert len(app._room_items) > 0, "Room list is empty after live sync"
+
+        # Welcome message should be visible (shown on mount before connect)
+        from textual.widgets import RichLog
+        log = app.query_one("#messages", RichLog)
+        assert log.lines, "Welcome message missing from log pane"
+
+        await app.action_quit()
