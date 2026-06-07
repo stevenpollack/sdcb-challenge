@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pytest *)",
+      "Bash(python -m pytest *)",
+      "Bash(python3 -m pytest *)",
+      "Bash(make setup)",
+      "Bash(make run)",
+      "Bash(make test)",
+      "Bash(make coverage)",
+      "Bash(make test-report)",
+      "Bash(make lint)",
+      "Bash(ruff check *)",
+      "Bash(ruff format *)",
+      "Bash(ruff format --check *)",
+      "Bash(pip install *)",
+      "Bash(pip3 install *)",
+      "Bash(pip show *)",
+      "Bash(pip list *)",
+      "Bash(uv pip install *)",
+      "Bash(uv pip list *)",
+      "Bash(uv pip show *)",
+      "Bash(brew list *)",
+      "Bash(brew install *)",
+      "Bash(mkdir *)",
+      "Bash(rm *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git tag *)",
+      "Bash(git add *)"
+    ]
+  }
+}

@@ -1,34 +1,35 @@
-# Makefile contract for the benchmark harness.
-#
-# The grader calls these targets directly, regardless of your stack. Implement each target's
-# body. Replace the `@echo ... && exit 1` lines with real commands. Do NOT rename or remove
-# targets, and keep their behavioral contract:
-#
-#   setup        install all dependencies from a clean checkout
-#   run          launch the TUI
-#   test         run the full suite; MUST exit non-zero if any test fails
-#   coverage     run tests with coverage; write the report to the path you declare in eval.meta.json
-#   test-report  run tests emitting JUnit XML to the path you declare in eval.meta.json
-#   lint         run your linter/formatter check (may be a no-op, but must exist and exit 0)
-#
-# After implementing, also set the real report paths in eval.meta.json.
+VENV := .venv
+PYTHON := $(VENV)/bin/python
+PIP := $(VENV)/bin/pip
+PYTEST := $(VENV)/bin/pytest
+RUFF := $(VENV)/bin/ruff
 
 .PHONY: setup run test coverage test-report lint
 
 setup:
-	@echo "TODO: implement 'make setup' (install dependencies)" && exit 1
+	python3 -m venv $(VENV)
+	$(PIP) install -e . pytest pytest-asyncio pytest-cov ruff
 
 run:
-	@echo "TODO: implement 'make run' (launch the TUI)" && exit 1
+	$(PYTHON) -m matrixtui
 
 test:
-	@echo "TODO: implement 'make test' (must exit non-zero on failure)" && exit 1
+	$(PYTEST) tests/ -v --tb=short
 
 coverage:
-	@echo "TODO: implement 'make coverage' (write report path from eval.meta.json)" && exit 1
+	$(PYTEST) tests/ --cov=matrixtui --cov-report=json:coverage-summary.json --tb=short
+	$(PYTHON) -c "\
+import json; \
+raw = json.load(open('coverage-summary.json')); \
+totals = raw.get('totals', {}); \
+pct = totals.get('percent_covered', 0); \
+summary = {'total': {'lines': {'pct': round(pct, 2)}}}; \
+json.dump(summary, open('coverage-summary.json', 'w')); \
+print(f'Coverage: {pct:.1f}%')"
 
 test-report:
-	@echo "TODO: implement 'make test-report' (emit JUnit XML to path in eval.meta.json)" && exit 1
+	$(PYTEST) tests/ --junitxml=junit.xml --tb=short
 
 lint:
-	@echo "TODO: implement 'make lint' (may be a no-op that exits 0)" && exit 1
+	$(RUFF) check matrixtui/ tests/ || true
+	@exit 0

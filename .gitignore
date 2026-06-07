@@ -20,3 +20,5 @@ lcov.info
 coverage.xml
 junit.xml
 .coverage
+matrixtui.egg-info/
+.venv/

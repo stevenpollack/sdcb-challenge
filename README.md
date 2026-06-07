@@ -1,62 +1,86 @@
-# Matrix TUI Benchmark — Workspace
+# matrixtui — Matrix Terminal UI Client
 
-This is a benchmark workspace. You (the model under test) build a **terminal UI client for the
-Matrix protocol** here, at the repository root. Your performance is evaluated afterward by the
-harness in [`eval/`](eval/).
+A terminal UI (TUI) client for the [Matrix](https://matrix.org) protocol, built with
+[matrix-nio](https://github.com/poljar/matrix-nio) and [Textual](https://textual.textualize.io/).
 
-## Read first
+## Requirements
 
-- [`eval/PROMPT.md`](eval/PROMPT.md) — your task, constraints, and required artifacts. **Start here.**
-- [`eval/EVALUATION.md`](eval/EVALUATION.md) — exactly how you will be scored. You are expected to
-  read this; a clear picture of evaluation is fair to have.
+- Python 3.11+
+- pip
 
-## Where to work
+## Setup (clean checkout)
 
-- Build your application at the **repository root** (e.g. `src/`, `tests/`, your own layout).
-- **Do not modify anything under `eval/`.** Those are the harness and grading scripts.
-- Fill in the placeholder files described below.
+```bash
+# 1. Create and activate a virtual environment (recommended)
+python3 -m venv .venv
+source .venv/bin/activate
 
-## Files you must provide or complete
+# 2. Install all dependencies
+make setup
 
-| File | Status in template | What to do |
-|---|---|---|
-| `Makefile` | stub with required targets | implement each target's body (see stub comments) |
-| `eval.meta.json` | example values | set your real report paths/formats |
-| `FEATURES.md` | empty ledger | append a row per feature with honest status |
-| `README` (yours) | this file | replace with your project's real README (setup must work from a clean checkout) |
-| `.env.local` | not present | created for you at run time with test credentials; do not commit it |
+# 3. Copy credentials file and fill in your Matrix credentials
+cp .env.local.example .env.local
+# Edit .env.local — set MATRIX_HOMESERVER, MATRIX_USER, MATRIX_PASSWORD
+```
 
-## The contract the harness depends on
+## Running
 
-The grader calls your `Makefile` targets directly and reads `eval.meta.json` for report locations.
-If a required target is missing or misbehaves, that capability fails. See `Makefile` and
-`eval/PROMPT.md` for the exact list.
+```bash
+make run
+# or directly:
+python -m matrixtui
+```
 
-## When you are done (model)
+### Credentials
 
-Tag your final commit `run-complete` (`git tag run-complete && git push origin run-complete`). That
-freezes the history for grading. Don't commit after tagging, and don't run the `eval/` scripts
-yourself — they're post-run tooling and waste your time budget.
-
-## Evaluation (automated)
-
-- **Every push** runs `.github/workflows/checks.yml`: a hard contract gate (required files + Make
-  targets) plus an informational snapshot of current-HEAD tests and coverage in the run summary.
-- **Post-run**, the evaluator manually triggers `.github/workflows/post-run-analysis.yml` (Actions
-  tab → Run workflow), which analyzes the `run-complete` tag by default: commit-size, duplication,
-  complexity, coverage trends, regression count, and the collapse point, rendered into the run
-  summary and uploaded as JSON artifacts.
-
-## Running the harness manually (evaluator)
-
-If you prefer running locally instead of via the workflow, from the repository root:
+The app reads credentials from `.env.local` in the repo root:
 
 ```
-cp eval/eval.config.example.json eval/eval.config.json   # adjust source_globs to the model's stack
-python eval/scripts/commit_size.py        eval/eval.config.json
-python eval/scripts/duplication_trend.py  eval/eval.config.json
-python eval/scripts/complexity_trend.py   eval/eval.config.json
-python eval/scripts/coverage_trend.py     eval/eval.config.json
-python eval/scripts/regression_count.py   eval/eval.config.json
-python eval/scripts/collapse.py
+MATRIX_HOMESERVER=https://matrix.org
+MATRIX_USER=@youruser:matrix.org
+MATRIX_PASSWORD=yourpassword
+```
+
+## Key bindings
+
+| Key | Action |
+|-----|--------|
+| Arrow keys / j/k | Navigate room list |
+| Enter | Select room |
+| Type + Enter | Send message |
+| Ctrl+R | Load older message history |
+| Ctrl+C | Quit |
+
+## Testing
+
+```bash
+# Unit tests only (no credentials needed)
+make test
+
+# Tests with coverage report
+make coverage        # writes coverage-summary.json
+
+# JUnit XML report
+make test-report     # writes junit.xml
+
+# Lint check
+make lint
+```
+
+Integration tests (marked `@pytest.mark.integration`) require `.env.local` with valid credentials.
+They are included in `make test` but will be skipped automatically if credentials are absent.
+
+## Project layout
+
+```
+matrixtui/        # application source
+  __init__.py
+  __main__.py     # entry point
+  config.py       # env/credential loading
+  client.py       # async Matrix client (matrix-nio wrapper)
+  app.py          # Textual TUI application
+tests/            # pytest suite
+  test_client.py  # unit tests for client logic
+  test_config.py  # config loading tests
+  test_integration.py  # live homeserver tests
 ```
