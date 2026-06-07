@@ -19,3 +19,7 @@ more heavily than an accurate `partial` or `broken`.
 | Member count in room title | working | Room title bar shows (N) member count after display name |
 | Read receipts | working | Sent automatically on room switch for the last visible message |
 | Room filter / search | working | Ctrl+F focuses filter box; typing hides non-matching rooms live |
+| Redacted message display | working | Redacted events show as [redacted] in-place; no crash on unknown event_id |
+| Message edits (m.replace) | working | Edited messages append [edited] and show new content in-place |
+| Room join via slash command | working | /join #alias:server joins room and updates room list |
+| Room leave via slash command | working | /leave leaves current room, removes from sidebar and clears pane |
