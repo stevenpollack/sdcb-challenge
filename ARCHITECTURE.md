@@ -25,6 +25,7 @@ matrixtui/
 | `on_room_update(cb)` | `cb(room_id: str)` | Room metadata changes (name, unread, members) |
 | `on_message(cb)` | `cb(room_id: str, msg: Message)` | New message arrives |
 | `on_typing(cb)` | `cb(room_id: str, users: list[str])` | Typing list changes |
+| `on_invite(cb)` | `cb(room_id: str, inviter: str)` | Incoming room invite |
 
 `MatrixApp` bridges these callbacks to Textual's event loop by posting custom
 `TMessage` subclasses (`RoomUpdated`, `NewMessage`, `TypingUpdated`) — the only
@@ -81,6 +82,21 @@ if text.startswith("/join "):
     room_alias = text[6:].strip()
     await self._client.join_room(room_alias)
     return
+```
+
+### Add a client API call
+
+Add a method to `MatrixClient` that calls the nio client directly. Return `bool` for
+success/failure, and swallow exceptions with a `logger.warning` so the UI never crashes:
+```python
+async def set_display_name(self, name: str) -> bool:
+    try:
+        from nio import ProfileSetDisplayNameResponse
+        resp = await self._client.set_displayname(name)
+        return isinstance(resp, ProfileSetDisplayNameResponse)
+    except Exception as exc:
+        logger.warning("set_display_name error: %s", exc)
+        return False
 ```
 
 ## Testing

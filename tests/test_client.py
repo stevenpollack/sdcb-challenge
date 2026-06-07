@@ -941,3 +941,68 @@ async def test_on_invite_event_ignores_non_invite():
 
     await client._on_invite_event(room, event)
     assert "!r:m.org" not in client.invites
+
+
+# ------------------------------------------------------------------
+# get_room_topic
+# ------------------------------------------------------------------
+
+def test_get_room_topic_returns_topic():
+    client = make_client()
+    nio_room = MagicMock()
+    nio_room.topic = "Welcome to the room!"
+    client._client.rooms = {"!r:m.org": nio_room}
+    assert client.get_room_topic("!r:m.org") == "Welcome to the room!"
+
+
+def test_get_room_topic_returns_none_when_unset():
+    client = make_client()
+    nio_room = MagicMock()
+    nio_room.topic = None
+    client._client.rooms = {"!r:m.org": nio_room}
+    assert client.get_room_topic("!r:m.org") is None
+
+
+def test_get_room_topic_returns_none_for_unknown_room():
+    client = make_client()
+    client._client.rooms = {}
+    assert client.get_room_topic("!unknown:m.org") is None
+
+
+# ------------------------------------------------------------------
+# set_display_name
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_set_display_name_returns_true_on_success():
+    client = make_client()
+    from nio import ProfileSetDisplayNameResponse
+    with patch.object(
+        client._client, "set_displayname", new_callable=AsyncMock
+    ) as mock_set:
+        mock_set.return_value = MagicMock(spec=ProfileSetDisplayNameResponse)
+        result = await client.set_display_name("Alice")
+    assert result is True
+    mock_set.assert_called_once_with("Alice")
+
+
+@pytest.mark.asyncio
+async def test_set_display_name_returns_false_on_failure():
+    client = make_client()
+    with patch.object(
+        client._client, "set_displayname", new_callable=AsyncMock
+    ) as mock_set:
+        mock_set.return_value = object()  # not ProfileSetDisplayNameResponse
+        result = await client.set_display_name("Alice")
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_set_display_name_swallows_exception():
+    client = make_client()
+    with patch.object(
+        client._client, "set_displayname", new_callable=AsyncMock,
+        side_effect=Exception("net error")
+    ):
+        result = await client.set_display_name("Alice")
+    assert result is False

@@ -395,6 +395,23 @@ class MatrixClient:
             return non_self[0]
         return room.room_id
 
+    def get_room_topic(self, room_id: str) -> str | None:
+        """Return the current topic for a room, or None if not set."""
+        nio_room = self._client.rooms.get(room_id)
+        if nio_room is None:
+            return None
+        return getattr(nio_room, "topic", None) or None
+
+    async def set_display_name(self, display_name: str) -> bool:
+        """Set the user's global display name. Returns True on success."""
+        try:
+            from nio import ProfileSetDisplayNameResponse
+            resp = await self._client.set_displayname(display_name)
+            return isinstance(resp, ProfileSetDisplayNameResponse)
+        except Exception as exc:
+            logger.warning("set_display_name error: %s", exc)
+            return False
+
     def search_messages(self, query: str, room_id: str | None = None) -> list[tuple[str, Message]]:
         """Search loaded messages for a query string (case-insensitive).
 

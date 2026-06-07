@@ -276,6 +276,11 @@ class MatrixApp(App):
             self._handle_search(query)
         elif text.startswith("/members"):
             self._handle_members()
+        elif text.startswith("/topic"):
+            self._handle_topic()
+        elif text.startswith("/nick "):
+            name = text[6:].strip()
+            await self._handle_nick(name)
         elif text.startswith("/help"):
             self._handle_help()
         elif self.current_room:
@@ -311,6 +316,27 @@ class MatrixApp(App):
             sender_short = msg.sender.split(":")[0].lstrip("@")
             log.write(f"[dim]{rname}[/dim] [{ts}] [bold]{sender_short}[/bold]: {msg.body}")
 
+    def _handle_topic(self) -> None:
+        if not self.current_room:
+            return
+        topic = self._client.get_room_topic(self.current_room)
+        log = self.query_one("#messages", RichLog)
+        if topic:
+            log.write(f"[dim]Topic:[/dim] {topic}")
+        else:
+            log.write("[dim]No topic set for this room.[/dim]")
+
+    async def _handle_nick(self, name: str) -> None:
+        if not name:
+            return
+        status = self.query_one("#status-bar", Static)
+        status.update(f"Setting display name to '{name}'…")
+        ok = await self._client.set_display_name(name)
+        if ok:
+            status.update(f"Display name set to '{name}'")
+        else:
+            status.update("Failed to set display name")
+
     def _handle_help(self) -> None:
         log = self.query_one("#messages", RichLog)
         log.clear()
@@ -328,6 +354,8 @@ class MatrixApp(App):
         log.write("  /leave                  Leave the current room")
         log.write("  /search <query>         Search messages in current room")
         log.write("  /members                List members of current room")
+        log.write("  /topic                  Show the current room topic")
+        log.write("  /nick <name>            Set your global display name")
 
     def _handle_members(self) -> None:
         if not self.current_room:

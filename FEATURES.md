@@ -29,3 +29,5 @@ more heavily than an accurate `partial` or `broken`.
 | In-app help | working | /help displays all keybindings and slash commands in the message pane |
 | Session persistence | working | Login token saved to ~/.config/matrixtui/session.json (mode 0o600); restored on next start |
 | Invite notifications | working | Incoming invites shown in status bar with /join prompt; stored in client.invites dict |
+| Room topic display | working | /topic shows current room topic in the message pane; shows "No topic set" when absent |
+| Display name change | working | /nick <name> sets the user's global Matrix display name via profile API |
