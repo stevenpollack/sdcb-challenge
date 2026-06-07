@@ -52,8 +52,10 @@ jobs:
       - name: Prepare eval config
         run: |
           cp eval/eval.config.example.json eval/eval.config.json
-          echo "Using default eval.config.json. If the model's stack puts source outside src/,"
-          echo "the evaluator should edit source_globs / complexity.source_dirs and re-run."
+          echo "::warning::Using DEFAULT source_globs (src/lib/tests/test). If the model's code"
+          echo "::warning::lives elsewhere, commit-size/complexity/duplication will silently read"
+          echo "::warning::as ZERO. Edit eval/eval.config.json source_globs + complexity.source_dirs"
+          echo "::warning::to the model's actual layout, commit it, and re-run before trusting trends."
 
       - name: Run objective trend scripts
         run: |
@@ -81,6 +83,40 @@ jobs:
           coll = load("collapse.json")
           reg  = load("regression_count.json")
           cov  = load("coverage_trend.json")
+          size = load("commit_size.json")
+          dup  = load("duplication_trend.json")
+          comp = load("complexity_trend.json")
+
+          # --- Data-quality checks driven by the actual computed results ---
+          warnings = []
+          if size and size.get("commits"):
+              if all(c.get("churn", 0) == 0 for c in size["commits"]) and len(size["commits"]) > 1:
+                  warnings.append("commit-size churn is 0 for EVERY commit — `source_globs` almost "
+                                  "certainly does not match where the code lives. commit-size and "
+                                  "oversize detection are meaningless until fixed.")
+          comp_list = comp if isinstance(comp, list) else (comp or {}).get("commits", [])
+          if comp_list and all(c.get("n_functions", 0) == 0 for c in comp_list):
+              warnings.append("complexity found 0 functions at every commit — "
+                              "`complexity.source_dirs` does not match the stack layout.")
+          dup_list = dup if isinstance(dup, list) else (dup or {}).get("commits", [])
+          if dup_list and all(c.get("dup_pct") is None for c in dup_list):
+              warnings.append("duplication returned no result at every commit — "
+                              "`duplication.source_dirs` does not match the stack, or jscpd found nothing.")
+          cov_list = (cov or {}).get("commits", [])
+          if cov_list and all(c.get("coverage_pct") is None for c in cov_list):
+              warnings.append("coverage is null at every commit — `make coverage` not producing the "
+                              "report at the path in eval.meta.json, or no tests yet.")
+          reg_list = (reg or {}).get("commits", [])
+          if reg_list and all(c.get("regressions_introduced") is None for c in reg_list):
+              warnings.append("regression detection produced no data at any commit — `make test-report` "
+                              "not emitting JUnit at the path in eval.meta.json.")
+
+          if warnings:
+              print("## ⚠️ DATA QUALITY — results below may be invalid\n")
+              for w in warnings:
+                  print(f"- {w}")
+                  print(f"::warning::{w}")  # also surface as a GitHub annotation
+              print("\nFix config / Makefile targets and re-run before trusting anything below.\n")
 
           print("## Headline\n")
           if coll and coll.get("collapse_index") is not None:
