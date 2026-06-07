@@ -52,3 +52,5 @@ more heavily than an accurate `partial` or `broken`.
 | Forget room | working | /forget removes a previously left room from server history; clears it from the sidebar |
 | Room alias management | working | /alias #alias:srv publishes a local alias for the current room via Matrix API |
 | User presence lookup | working | /getpresence <@user> fetches and displays online/offline status and status message |
+| Alias resolution | working | /resolve #alias:srv resolves a room alias to its internal room ID |
+| Avatar update | working | /setavatar <mxc://> sets the user's global avatar to an mxc:// URI |

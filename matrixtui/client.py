@@ -16,12 +16,14 @@ from nio import (
     MessageDirection,
     PresenceGetResponse,
     PresenceSetResponse,
+    ProfileSetAvatarResponse,
     RoomBanResponse,
     RoomCreateResponse,
     RoomForgetResponse,
     RoomInviteResponse,
     RoomKickResponse,
     RoomPutAliasResponse,
+    RoomResolveAliasResponse,
     RoomMessage,
     RoomMessageAudio,
     RoomMessageEmote,
@@ -547,6 +549,25 @@ class MatrixClient:
             return isinstance(resp, PresenceSetResponse)
         except Exception as exc:
             logger.warning("set_presence error: %s", exc)
+        return False
+
+    async def resolve_alias(self, alias: str) -> str | None:
+        """Resolve a room alias to a room_id. Returns room_id or None on failure."""
+        try:
+            resp = await self._client.room_resolve_alias(alias)
+            if isinstance(resp, RoomResolveAliasResponse):
+                return resp.room_id
+        except Exception as exc:
+            logger.warning("resolve_alias error: %s", exc)
+        return None
+
+    async def set_avatar(self, avatar_url: str) -> bool:
+        """Set the user's avatar. avatar_url must be an mxc:// URI. Returns True on success."""
+        try:
+            resp = await self._client.set_avatar(avatar_url)
+            return isinstance(resp, ProfileSetAvatarResponse)
+        except Exception as exc:
+            logger.warning("set_avatar error: %s", exc)
         return False
 
     async def forget_room(self, room_id: str) -> bool:

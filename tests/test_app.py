@@ -1798,3 +1798,61 @@ async def test_getpresence_not_found_shows_dim():
         await asyncio.ensure_future(app._handle_getpresence("@ghost:m.org"))
         await pilot.pause(0.1)
         assert any("Could not fetch" in str(line) for line in log.lines)
+
+
+# ------------------------------------------------------------------
+# /resolve and /setavatar handlers
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_resolve_shows_room_id():
+    app, client = make_app()
+    client.resolve_alias = AsyncMock(return_value="!r:m.org")
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import RichLog
+        import asyncio
+        await asyncio.ensure_future(app._handle_resolve("#test:m.org"))
+        await pilot.pause(0.1)
+        log = app.query_one("#messages", RichLog)
+        assert any("!r:m.org" in str(line) for line in log.lines)
+
+
+@pytest.mark.asyncio
+async def test_resolve_not_found_shows_error():
+    app, client = make_app()
+    client.resolve_alias = AsyncMock(return_value=None)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import RichLog
+        import asyncio
+        await asyncio.ensure_future(app._handle_resolve("#bad:m.org"))
+        await pilot.pause(0.1)
+        log = app.query_one("#messages", RichLog)
+        assert any("Could not resolve" in str(line) for line in log.lines)
+
+
+@pytest.mark.asyncio
+async def test_setavatar_success():
+    app, client = make_app()
+    client.set_avatar = AsyncMock(return_value=True)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import Static
+        import asyncio
+        await asyncio.ensure_future(app._handle_setavatar("mxc://m.org/abc"))
+        await pilot.pause(0.1)
+        assert "Avatar updated" in str(app.query_one("#status-bar", Static).content)
+
+
+@pytest.mark.asyncio
+async def test_setavatar_failure():
+    app, client = make_app()
+    client.set_avatar = AsyncMock(return_value=False)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import Static
+        import asyncio
+        await asyncio.ensure_future(app._handle_setavatar("mxc://m.org/abc"))
+        await pilot.pause(0.1)
+        assert "Failed to set avatar" in str(app.query_one("#status-bar", Static).content)

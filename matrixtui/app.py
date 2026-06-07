@@ -350,6 +350,12 @@ class MatrixApp(App):
             await self._handle_rename(name)
         elif text == "/forget":
             await self._handle_forget()
+        elif text.startswith("/resolve "):
+            alias = text[9:].strip()
+            await self._handle_resolve(alias)
+        elif text.startswith("/setavatar "):
+            url = text[11:].strip()
+            await self._handle_setavatar(url)
         elif text.startswith("/alias "):
             alias = text[7:].strip()
             await self._handle_alias(alias)
@@ -456,6 +462,23 @@ class MatrixApp(App):
         self.query_one("#status-bar", Static).update(
             f"Presence set to {state}" if ok else "Failed to set presence"
         )
+
+    async def _handle_resolve(self, alias: str) -> None:
+        if not alias:
+            return
+        log = self.query_one("#messages", RichLog)
+        room_id = await self._client.resolve_alias(alias)
+        if room_id:
+            log.write(f"[dim]{alias}[/dim] → [bold]{room_id}[/bold]")
+        else:
+            log.write(f"[dim]Could not resolve alias {alias}[/dim]")
+
+    async def _handle_setavatar(self, url: str) -> None:
+        if not url:
+            return
+        status = self.query_one("#status-bar", Static)
+        ok = await self._client.set_avatar(url)
+        status.update("Avatar updated" if ok else "Failed to set avatar")
 
     async def _handle_forget(self) -> None:
         if not self.current_room:
@@ -625,6 +648,8 @@ class MatrixApp(App):
         log.write("  /dm <@user:srv>         Open a direct message room with a user")
         log.write("  /presence <state>       Set presence: online, offline, unavailable")
         log.write("  /rename <name>          Rename the current room")
+        log.write("  /resolve #alias:srv     Resolve a room alias to its room ID")
+        log.write("  /setavatar <mxc://>     Set your avatar to an mxc:// URI")
         log.write("  /forget                 Forget a previously left room")
         log.write("  /alias #alias:srv       Publish a local alias for the current room")
         log.write("  /getpresence <@user>    Show a user's presence status")

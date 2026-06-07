@@ -1689,3 +1689,59 @@ async def test_get_presence_exception_returns_none():
     client = make_client()
     client._client.get_presence = AsyncMock(side_effect=Exception("network"))
     assert await client.get_presence("@bob:m.org") is None
+
+
+# ------------------------------------------------------------------
+# resolve_alias / set_avatar
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_resolve_alias_success():
+    from nio import RoomResolveAliasResponse
+    client = make_client()
+    client._client.room_resolve_alias = AsyncMock(
+        return_value=RoomResolveAliasResponse("#test:m.org", "!r:m.org", [])
+    )
+    room_id = await client.resolve_alias("#test:m.org")
+    assert room_id == "!r:m.org"
+
+
+@pytest.mark.asyncio
+async def test_resolve_alias_failure_returns_none():
+    from nio import RoomResolveAliasError
+    client = make_client()
+    client._client.room_resolve_alias = AsyncMock(
+        return_value=RoomResolveAliasError("not_found")
+    )
+    assert await client.resolve_alias("#bad:m.org") is None
+
+
+@pytest.mark.asyncio
+async def test_resolve_alias_exception_returns_none():
+    client = make_client()
+    client._client.room_resolve_alias = AsyncMock(side_effect=Exception("network"))
+    assert await client.resolve_alias("#test:m.org") is None
+
+
+@pytest.mark.asyncio
+async def test_set_avatar_success():
+    from nio import ProfileSetAvatarResponse
+    client = make_client()
+    client._client.set_avatar = AsyncMock(return_value=ProfileSetAvatarResponse())
+    assert await client.set_avatar("mxc://m.org/abc") is True
+    client._client.set_avatar.assert_called_once_with("mxc://m.org/abc")
+
+
+@pytest.mark.asyncio
+async def test_set_avatar_failure_returns_false():
+    from nio import ProfileSetAvatarError
+    client = make_client()
+    client._client.set_avatar = AsyncMock(return_value=ProfileSetAvatarError("forbidden"))
+    assert await client.set_avatar("mxc://m.org/abc") is False
+
+
+@pytest.mark.asyncio
+async def test_set_avatar_exception_returns_false():
+    client = make_client()
+    client._client.set_avatar = AsyncMock(side_effect=Exception("network"))
+    assert await client.set_avatar("mxc://m.org/abc") is False
