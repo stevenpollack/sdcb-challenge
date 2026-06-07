@@ -10,6 +10,7 @@ from nio import (
     AsyncClient,
     AsyncClientConfig,
     InviteMemberEvent,
+    JoinedMembersResponse,
     JoinResponse,
     LoginResponse,
     MatrixRoom,
@@ -550,6 +551,33 @@ class MatrixClient:
         except Exception as exc:
             logger.warning("set_presence error: %s", exc)
         return False
+
+    async def get_joined_members(self, room_id: str) -> list[dict] | None:
+        """Fetch live member list from server. Returns list of {user_id, display_name} or None."""
+        try:
+            resp = await self._client.joined_members(room_id)
+            if isinstance(resp, JoinedMembersResponse):
+                return [
+                    {"user_id": m.user_id, "display_name": m.display_name or m.user_id}
+                    for m in resp.members
+                ]
+        except Exception as exc:
+            logger.warning("get_joined_members error: %s", exc)
+        return None
+
+    def mxc_to_http(self, mxc_url: str) -> str | None:
+        """Convert an mxc:// URI to an HTTP download URL."""
+        return self._client.mxc_to_http(mxc_url)
+
+    def get_stats(self) -> dict:
+        """Return local cache statistics."""
+        total_msgs = sum(len(msgs) for msgs in self.messages.values())
+        return {
+            "rooms": len(self.rooms),
+            "messages": total_msgs,
+            "typing_rooms": len([r for r, u in self.typing_users.items() if u]),
+            "pending_invites": len(self.invites),
+        }
 
     async def resolve_alias(self, alias: str) -> str | None:
         """Resolve a room alias to a room_id. Returns room_id or None on failure."""

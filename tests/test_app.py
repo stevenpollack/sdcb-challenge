@@ -1856,3 +1856,98 @@ async def test_setavatar_failure():
         await asyncio.ensure_future(app._handle_setavatar("mxc://m.org/abc"))
         await pilot.pause(0.1)
         assert "Failed to set avatar" in str(app.query_one("#status-bar", Static).content)
+
+
+# ------------------------------------------------------------------
+# /joined, /mxcurl, /stats handlers
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_joined_shows_live_members():
+    app, client = make_app()
+    client.get_joined_members = AsyncMock(return_value=[
+        {"user_id": "@alice:m.org", "display_name": "Alice"},
+        {"user_id": "@bob:m.org", "display_name": "@bob:m.org"},
+    ])
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView, RichLog
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        import asyncio
+        await asyncio.ensure_future(app._handle_joined())
+        await pilot.pause(0.1)
+        log = app.query_one("#messages", RichLog)
+        assert any("@alice:m.org" in str(line) for line in log.lines)
+        assert any("2" in str(line) for line in log.lines)
+
+
+@pytest.mark.asyncio
+async def test_joined_failure_shows_error():
+    app, client = make_app()
+    client.get_joined_members = AsyncMock(return_value=None)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView, RichLog
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        import asyncio
+        await asyncio.ensure_future(app._handle_joined())
+        await pilot.pause(0.1)
+        log = app.query_one("#messages", RichLog)
+        assert any("Could not fetch" in str(line) for line in log.lines)
+
+
+@pytest.mark.asyncio
+async def test_joined_no_room_noop():
+    app, client = make_app()
+    client.get_joined_members = AsyncMock(return_value=[])
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        import asyncio
+        await asyncio.ensure_future(app._handle_joined())
+        await pilot.pause(0.1)
+        client.get_joined_members.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_mxcurl_shows_http_url():
+    app, client = make_app()
+    client.mxc_to_http = MagicMock(return_value="https://m.org/_matrix/media/v3/download/m.org/abc")
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import RichLog
+        app._handle_mxcurl("mxc://m.org/abc")
+        await pilot.pause(0.1)
+        log = app.query_one("#messages", RichLog)
+        assert any("https://" in str(line) for line in log.lines)
+
+
+@pytest.mark.asyncio
+async def test_mxcurl_failure_shows_error():
+    app, client = make_app()
+    client.mxc_to_http = MagicMock(return_value=None)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import RichLog
+        app._handle_mxcurl("bad-uri")
+        await pilot.pause(0.1)
+        log = app.query_one("#messages", RichLog)
+        assert any("Could not convert" in str(line) for line in log.lines)
+
+
+@pytest.mark.asyncio
+async def test_stats_shows_counts():
+    app, client = make_app()
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import RichLog
+        app._handle_stats()
+        await pilot.pause(0.1)
+        log = app.query_one("#messages", RichLog)
+        assert any("Rooms" in str(line) for line in log.lines)
+        assert any("Messages" in str(line) for line in log.lines)

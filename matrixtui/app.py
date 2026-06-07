@@ -353,6 +353,13 @@ class MatrixApp(App):
         elif text.startswith("/resolve "):
             alias = text[9:].strip()
             await self._handle_resolve(alias)
+        elif text.startswith("/joined"):
+            await self._handle_joined()
+        elif text.startswith("/mxcurl "):
+            mxc = text[8:].strip()
+            self._handle_mxcurl(mxc)
+        elif text == "/stats":
+            self._handle_stats()
         elif text.startswith("/setavatar "):
             url = text[11:].strip()
             await self._handle_setavatar(url)
@@ -462,6 +469,39 @@ class MatrixApp(App):
         self.query_one("#status-bar", Static).update(
             f"Presence set to {state}" if ok else "Failed to set presence"
         )
+
+    async def _handle_joined(self) -> None:
+        if not self.current_room:
+            return
+        log = self.query_one("#messages", RichLog)
+        members = await self._client.get_joined_members(self.current_room)
+        if members is None:
+            log.write("[dim]Could not fetch member list from server[/dim]")
+            return
+        log.clear()
+        log.write(f"[dim]Joined members ({len(members)}) — live from server:[/dim]")
+        for m in sorted(members, key=lambda x: x["user_id"]):
+            log.write(f"  {m['user_id']}  [dim]{m['display_name']}[/dim]")
+
+    def _handle_mxcurl(self, mxc: str) -> None:
+        if not mxc:
+            return
+        log = self.query_one("#messages", RichLog)
+        http_url = self._client.mxc_to_http(mxc)
+        if http_url:
+            log.write(f"[dim]{mxc}[/dim]")
+            log.write(f"  → {http_url}")
+        else:
+            log.write(f"[dim]Could not convert {mxc}[/dim]")
+
+    def _handle_stats(self) -> None:
+        stats = self._client.get_stats()
+        log = self.query_one("#messages", RichLog)
+        log.write("[bold]matrixtui local cache stats[/bold]")
+        log.write(f"  Rooms loaded:      {stats['rooms']}")
+        log.write(f"  Messages cached:   {stats['messages']}")
+        log.write(f"  Pending invites:   {stats['pending_invites']}")
+        log.write(f"  Active typists:    {stats['typing_rooms']} rooms")
 
     async def _handle_resolve(self, alias: str) -> None:
         if not alias:
@@ -648,6 +688,9 @@ class MatrixApp(App):
         log.write("  /dm <@user:srv>         Open a direct message room with a user")
         log.write("  /presence <state>       Set presence: online, offline, unavailable")
         log.write("  /rename <name>          Rename the current room")
+        log.write("  /joined                 Fetch live member list from server")
+        log.write("  /mxcurl <mxc://>        Convert mxc:// media URI to HTTP download URL")
+        log.write("  /stats                  Show local cache statistics")
         log.write("  /resolve #alias:srv     Resolve a room alias to its room ID")
         log.write("  /setavatar <mxc://>     Set your avatar to an mxc:// URI")
         log.write("  /forget                 Forget a previously left room")

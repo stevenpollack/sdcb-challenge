@@ -1745,3 +1745,82 @@ async def test_set_avatar_exception_returns_false():
     client = make_client()
     client._client.set_avatar = AsyncMock(side_effect=Exception("network"))
     assert await client.set_avatar("mxc://m.org/abc") is False
+
+
+# ------------------------------------------------------------------
+# get_joined_members / mxc_to_http / get_stats
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_get_joined_members_success():
+    from nio import JoinedMembersResponse, RoomMember
+    client = make_client()
+    m1 = MagicMock(spec=RoomMember)
+    m1.user_id = "@alice:m.org"
+    m1.display_name = "Alice"
+    m2 = MagicMock(spec=RoomMember)
+    m2.user_id = "@bob:m.org"
+    m2.display_name = None
+    client._client.joined_members = AsyncMock(
+        return_value=JoinedMembersResponse([m1, m2], "!r:m.org")
+    )
+    result = await client.get_joined_members("!r:m.org")
+    assert result is not None
+    assert len(result) == 2
+    alice = next(r for r in result if r["user_id"] == "@alice:m.org")
+    assert alice["display_name"] == "Alice"
+    bob = next(r for r in result if r["user_id"] == "@bob:m.org")
+    assert bob["display_name"] == "@bob:m.org"  # falls back to user_id
+
+
+@pytest.mark.asyncio
+async def test_get_joined_members_failure_returns_none():
+    from nio import JoinedMembersError
+    client = make_client()
+    client._client.joined_members = AsyncMock(return_value=JoinedMembersError("forbidden"))
+    assert await client.get_joined_members("!r:m.org") is None
+
+
+@pytest.mark.asyncio
+async def test_get_joined_members_exception_returns_none():
+    client = make_client()
+    client._client.joined_members = AsyncMock(side_effect=Exception("network"))
+    assert await client.get_joined_members("!r:m.org") is None
+
+
+def test_mxc_to_http_delegates_to_nio():
+    client = make_client()
+    client._client.mxc_to_http = MagicMock(return_value="https://m.org/_matrix/media/v3/download/m.org/abc")
+    result = client.mxc_to_http("mxc://m.org/abc")
+    assert result == "https://m.org/_matrix/media/v3/download/m.org/abc"
+    client._client.mxc_to_http.assert_called_once_with("mxc://m.org/abc")
+
+
+def test_mxc_to_http_returns_none_on_invalid():
+    client = make_client()
+    client._client.mxc_to_http = MagicMock(return_value=None)
+    assert client.mxc_to_http("not-an-mxc") is None
+
+
+def test_get_stats_empty():
+    client = make_client()
+    stats = client.get_stats()
+    assert stats["rooms"] == 0
+    assert stats["messages"] == 0
+    assert stats["pending_invites"] == 0
+
+
+def test_get_stats_with_data():
+    client = make_client()
+    client.rooms = {"!r1:m.org": MagicMock(), "!r2:m.org": MagicMock()}
+    client.messages = {
+        "!r1:m.org": [MagicMock(), MagicMock()],
+        "!r2:m.org": [MagicMock()],
+    }
+    client.invites = {"!r3:m.org": "@alice:m.org"}
+    client.typing_users = {"!r1:m.org": ["@alice:m.org"], "!r2:m.org": []}
+    stats = client.get_stats()
+    assert stats["rooms"] == 2
+    assert stats["messages"] == 3
+    assert stats["pending_invites"] == 1
+    assert stats["typing_rooms"] == 1

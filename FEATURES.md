@@ -54,3 +54,6 @@ more heavily than an accurate `partial` or `broken`.
 | User presence lookup | working | /getpresence <@user> fetches and displays online/offline status and status message |
 | Alias resolution | working | /resolve #alias:srv resolves a room alias to its internal room ID |
 | Avatar update | working | /setavatar <mxc://> sets the user's global avatar to an mxc:// URI |
+| Live member list | working | /joined fetches current room members live from server (vs. cached /members) |
+| Media URL conversion | working | /mxcurl <mxc://> converts a Matrix media URI to an HTTP download URL |
+| Local cache stats | working | /stats shows rooms loaded, messages cached, pending invites, and active typists |
