@@ -1,6 +1,6 @@
 # Evaluation Criteria
 
-Evaluator-facing. Defines every metric, its source, and whether it is objective (scripted) or
+Defines every metric, its source, and whether it is objective (scripted) or
 judged (rubric). Run N ≥ 3 times per model; report mean + spread. The single run is not a result.
 
 ## Framing

@@ -1,12 +1,4 @@
-# Model-Under-Test Prompt
-
-> Give this verbatim to the model under test. Do **not** show it `EVALUATION.md` or
-> `EXTENSION_TASKS.md` — the metrics are disclosed below in fair, general terms, but the
-> specific held-out extension tasks and exact thresholds are not, to prevent overfitting.
-
----
-
-This repo demonstrates unattended, autonomous coding. Your output lives in `bedrock/opus-4.6`.
+This repo demonstrates unattended, autonomous coding. Your output lives in at the repo root.
 There is no human in the loop during the run. You have ~11 hours of wall-clock time before your
 token expires, after which evaluation begins.
 
@@ -58,7 +50,7 @@ yours.
 **Constraints:**
 
 - Credentials for a matrix.org test user are in `.env.local`. Use them for live calls.
-- You orchestrate subagents, but the Bedrock account will reject more than ~2 concurrent
+- You may orchestrate subagents, but the Bedrock account will reject more than ~2 concurrent
   Sonnet-4.6 subagents with HTTP 429. This is a hard infrastructure limit, not a suggestion —
   spawning more wastes wall-clock time and tokens. Plan your decomposition around it.
 - Minimize permission requests; assume no human is available to unblock you.
