@@ -14,3 +14,8 @@ more heavily than an accurate `partial` or `broken`.
 | Load older history | working | Ctrl+R fetches prior page via /messages; prepends to message list |
 | Display names & timestamps | working | Sender localpart shown; UTC HH:MM timestamp per message |
 | Unread count badge | partial | Count shown in room list when server reports unread_notifications; resets only on server side |
+| Non-text message types | working | Images, files, video, audio shown as [type: filename]; emotes prefixed with *; notices dimmed |
+| Typing indicators | working | Status line below messages shows "alice is typing…" updated via TypingNoticeEvent |
+| Member count in room title | working | Room title bar shows (N) member count after display name |
+| Read receipts | working | Sent automatically on room switch for the last visible message |
+| Room filter / search | working | Ctrl+F focuses filter box; typing hides non-matching rooms live |
