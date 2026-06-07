@@ -836,3 +836,67 @@ async def test_on_room_name_updates_display_name():
 def test_nio_client_property():
     client = make_client()
     assert client.nio_client is client._client
+
+
+def test_client_has_invites_dict():
+    client = make_client()
+    assert client.invites == {}
+
+
+# ------------------------------------------------------------------
+# Invite events
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_on_invite_event_stores_invite():
+    client = make_client()
+    cb = MagicMock()
+    client.on_invite(cb)
+
+    room = MagicMock()
+    room.room_id = "!invited:m.org"
+
+    event = MagicMock()
+    event.membership = "invite"
+    event.state_key = "@test:matrix.org"  # targets this user
+    event.sender = "@alice:m.org"
+
+    await client._on_invite_event(room, event)
+
+    assert client.invites["!invited:m.org"] == "@alice:m.org"
+    cb.assert_called_once_with("!invited:m.org", "@alice:m.org")
+
+
+@pytest.mark.asyncio
+async def test_on_invite_event_ignores_other_targets():
+    """Invites targeting a different user should be ignored."""
+    client = make_client()
+    cb = MagicMock()
+    client.on_invite(cb)
+
+    room = MagicMock()
+    room.room_id = "!invited:m.org"
+    event = MagicMock()
+    event.membership = "invite"
+    event.state_key = "@other:m.org"  # not this user
+    event.sender = "@alice:m.org"
+
+    await client._on_invite_event(room, event)
+
+    assert "!invited:m.org" not in client.invites
+    cb.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_on_invite_event_ignores_non_invite():
+    """Non-invite membership events should be ignored."""
+    client = make_client()
+    room = MagicMock()
+    room.room_id = "!r:m.org"
+    event = MagicMock()
+    event.membership = "join"
+    event.state_key = "@test:matrix.org"
+    event.sender = "@alice:m.org"
+
+    await client._on_invite_event(room, event)
+    assert "!r:m.org" not in client.invites
