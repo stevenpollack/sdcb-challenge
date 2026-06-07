@@ -35,6 +35,7 @@ def test_message_defaults():
     msg = Message(event_id="$x", sender="@a:m.org", body="hi", timestamp=0)
     assert msg.is_me is False
     assert msg.msgtype == "m.text"
+    assert msg.mentions_me is False
 
 
 def test_room_summary_defaults():
@@ -81,6 +82,7 @@ def test_event_to_message_text():
     assert msg.body == "hello"
     assert msg.msgtype == "m.text"
     assert msg.is_me is False
+    assert msg.mentions_me is False
 
 
 def test_event_to_message_is_me():
@@ -89,6 +91,40 @@ def test_event_to_message_is_me():
     event = make_event(sender="@test:matrix.org", cls=RoomMessageText)
     msg = client._event_to_message(event)
     assert msg.is_me is True
+
+
+def test_event_to_message_mentions_me_by_localpart():
+    client = make_client()
+    from nio import RoomMessageText
+    # Body mentions the local user's localpart ("test")
+    event = make_event(body="hey test, what do you think?", cls=RoomMessageText)
+    msg = client._event_to_message(event)
+    assert msg.mentions_me is True
+
+
+def test_event_to_message_mentions_me_by_mxid():
+    client = make_client()
+    from nio import RoomMessageText
+    event = make_event(body="ping @test:matrix.org please reply", cls=RoomMessageText)
+    msg = client._event_to_message(event)
+    assert msg.mentions_me is True
+
+
+def test_event_to_message_no_mention():
+    client = make_client()
+    from nio import RoomMessageText
+    event = make_event(body="nothing relevant here", cls=RoomMessageText)
+    msg = client._event_to_message(event)
+    assert msg.mentions_me is False
+
+
+def test_event_to_message_self_mention_not_flagged():
+    """Own messages should not set mentions_me even if body has own localpart."""
+    client = make_client()
+    from nio import RoomMessageText
+    event = make_event(sender="@test:matrix.org", body="test test test", cls=RoomMessageText)
+    msg = client._event_to_message(event)
+    assert msg.mentions_me is False
 
 
 def test_event_to_message_image():
@@ -733,3 +769,70 @@ async def test_start_sync_calls_sync_and_starts_task():
     assert client._running is True
     assert client._sync_task is not None
     client._sync_task.cancel()  # cleanup
+
+
+@pytest.mark.asyncio
+async def test_login_succeeds_sets_no_error():
+    """Verify successful login calls nio login and doesn't raise."""
+    client = make_client()
+    from nio import LoginResponse
+    mock_resp = MagicMock(spec=LoginResponse)
+    with patch.object(client._client, "login", new_callable=AsyncMock) as mock_login:
+        mock_login.return_value = mock_resp
+        await client.login("validpw")  # should not raise
+    mock_login.assert_called_once_with("validpw", device_name="matrixtui")
+
+
+@pytest.mark.asyncio
+async def test_logout_with_token_calls_logout():
+    client = make_client()
+    client._client.access_token = "tok123"
+    client._client.logout = AsyncMock()
+    client._client.close = AsyncMock()
+    await client.logout()
+    client._client.logout.assert_called_once()
+    client._client.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_logout_swallows_logout_exception():
+    """If nio logout raises, we still close the session."""
+    client = make_client()
+    client._client.access_token = "tok123"
+    client._client.logout = AsyncMock(side_effect=Exception("server error"))
+    client._client.close = AsyncMock()
+    await client.logout()  # should not raise
+    client._client.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_on_room_name_noop_for_unknown_room():
+    """_on_room_name should be silent when the room isn't in self.rooms."""
+    client = make_client()
+    room = MagicMock()
+    room.room_id = "!unknown:m.org"
+    event = MagicMock()
+    cb = MagicMock()
+    client.on_room_update(cb)
+    await client._on_room_name(room, event)
+    cb.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_on_room_name_updates_display_name():
+    client = make_client()
+    client.rooms["!r:m.org"] = RoomSummary("!r:m.org", "Old")
+    room = MagicMock()
+    room.room_id = "!r:m.org"
+    room.display_name = "New Name"
+    room.name = None
+    room.users = {}
+    room.own_user_id = "@me:m.org"
+    event = MagicMock()
+    await client._on_room_name(room, event)
+    assert client.rooms["!r:m.org"].display_name == "New Name"
+
+
+def test_nio_client_property():
+    client = make_client()
+    assert client.nio_client is client._client
