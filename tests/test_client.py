@@ -1320,3 +1320,89 @@ async def test_kick_user_exception_returns_false():
     client._client.room_kick = AsyncMock(side_effect=Exception("network error"))
     result = await client.kick_user("!r:m.org", "@bob:m.org")
     assert result is False
+
+
+# ------------------------------------------------------------------
+# ban_user / create_room / set_room_topic
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_ban_user_success():
+    from nio import RoomBanResponse
+    client = make_client()
+    client._client.room_ban = AsyncMock(return_value=RoomBanResponse())
+    assert await client.ban_user("!r:m.org", "@bad:m.org") is True
+    client._client.room_ban.assert_called_once_with("!r:m.org", "@bad:m.org", None)
+
+
+@pytest.mark.asyncio
+async def test_ban_user_with_reason():
+    from nio import RoomBanResponse
+    client = make_client()
+    client._client.room_ban = AsyncMock(return_value=RoomBanResponse())
+    await client.ban_user("!r:m.org", "@bad:m.org", "spam")
+    client._client.room_ban.assert_called_once_with("!r:m.org", "@bad:m.org", "spam")
+
+
+@pytest.mark.asyncio
+async def test_ban_user_failure_returns_false():
+    from nio import RoomBanError
+    client = make_client()
+    client._client.room_ban = AsyncMock(return_value=RoomBanError("forbidden"))
+    assert await client.ban_user("!r:m.org", "@bad:m.org") is False
+
+
+@pytest.mark.asyncio
+async def test_ban_user_exception_returns_false():
+    client = make_client()
+    client._client.room_ban = AsyncMock(side_effect=Exception("network"))
+    assert await client.ban_user("!r:m.org", "@bad:m.org") is False
+
+
+@pytest.mark.asyncio
+async def test_create_room_success():
+    from nio import RoomCreateResponse
+    client = make_client()
+    client._client.room_create = AsyncMock(return_value=RoomCreateResponse("!new:m.org"))
+    room_id = await client.create_room("My Room")
+    assert room_id == "!new:m.org"
+    client._client.room_create.assert_called_once_with(name="My Room")
+
+
+@pytest.mark.asyncio
+async def test_create_room_failure_returns_none():
+    from nio import RoomCreateError
+    client = make_client()
+    client._client.room_create = AsyncMock(return_value=RoomCreateError("forbidden"))
+    assert await client.create_room("My Room") is None
+
+
+@pytest.mark.asyncio
+async def test_create_room_exception_returns_none():
+    client = make_client()
+    client._client.room_create = AsyncMock(side_effect=Exception("network"))
+    assert await client.create_room("My Room") is None
+
+
+@pytest.mark.asyncio
+async def test_set_room_topic_success():
+    from nio import RoomPutStateResponse
+    client = make_client()
+    client._client.update_room_topic = AsyncMock(return_value=RoomPutStateResponse("$ev", "!r:m.org"))
+    assert await client.set_room_topic("!r:m.org", "Hello world") is True
+    client._client.update_room_topic.assert_called_once_with("!r:m.org", "Hello world")
+
+
+@pytest.mark.asyncio
+async def test_set_room_topic_failure_returns_false():
+    from nio import RoomPutStateError
+    client = make_client()
+    client._client.update_room_topic = AsyncMock(return_value=RoomPutStateError("forbidden"))
+    assert await client.set_room_topic("!r:m.org", "Hello") is False
+
+
+@pytest.mark.asyncio
+async def test_set_room_topic_exception_returns_false():
+    client = make_client()
+    client._client.update_room_topic = AsyncMock(side_effect=Exception("network"))
+    assert await client.set_room_topic("!r:m.org", "Hello") is False

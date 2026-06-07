@@ -15,6 +15,8 @@ from nio import (
     MatrixRoom,
     MessageDirection,
     RedactionEvent,
+    RoomBanResponse,
+    RoomCreateResponse,
     RoomInviteResponse,
     RoomKickResponse,
     RoomMessage,
@@ -26,6 +28,7 @@ from nio import (
     RoomMessagesResponse,
     RoomMessageVideo,
     RoomNameEvent,
+    RoomPutStateResponse,
     RoomSendResponse,
     SyncResponse,
     TypingNoticeEvent,
@@ -463,6 +466,34 @@ class MatrixClient:
             return isinstance(resp, RoomKickResponse)
         except Exception as exc:
             logger.warning("kick_user error: %s", exc)
+        return False
+
+    async def ban_user(self, room_id: str, user_id: str, reason: str = "") -> bool:
+        """Ban a user from a room. Returns True on success."""
+        try:
+            resp = await self._client.room_ban(room_id, user_id, reason or None)
+            return isinstance(resp, RoomBanResponse)
+        except Exception as exc:
+            logger.warning("ban_user error: %s", exc)
+        return False
+
+    async def create_room(self, name: str) -> str | None:
+        """Create a new room with the given name. Returns room_id on success."""
+        try:
+            resp = await self._client.room_create(name=name)
+            if isinstance(resp, RoomCreateResponse):
+                return resp.room_id
+        except Exception as exc:
+            logger.warning("create_room error: %s", exc)
+        return None
+
+    async def set_room_topic(self, room_id: str, topic: str) -> bool:
+        """Set the topic for a room. Returns True on success."""
+        try:
+            resp = await self._client.update_room_topic(room_id, topic)
+            return isinstance(resp, RoomPutStateResponse)
+        except Exception as exc:
+            logger.warning("set_room_topic error: %s", exc)
         return False
 
     def search_messages(self, query: str, room_id: str | None = None) -> list[tuple[str, Message]]:

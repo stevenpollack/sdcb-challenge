@@ -38,3 +38,6 @@ more heavily than an accurate `partial` or `broken`.
 | Total unread in status bar | working | Status bar shows "[N unread]" count across all rooms; updates live on sync |
 | Room member invite | working | /invite <@user:srv> sends room invite via Matrix API; success/failure shown in status bar |
 | Room member kick | working | /kick <@user:srv> kicks a user from current room via Matrix API; success/failure shown in status bar |
+| Room member ban | working | /ban <@user:srv> bans a user from current room via Matrix API; success/failure shown in status bar |
+| Room creation | working | /create <name> creates a new private room; room_id shown in status bar on success |
+| Set room topic | working | /settopic <text> updates the room topic via state event; confirms in status bar and message pane |

@@ -316,6 +316,17 @@ class MatrixApp(App):
         elif text.startswith("/kick "):
             target = text[6:].strip()
             await self._handle_kick(target)
+        elif text.startswith("/ban "):
+            target = text[5:].strip()
+            await self._handle_ban(target)
+        elif text.startswith("/create "):
+            name = text[8:].strip()
+            await self._handle_create(name)
+        elif text.startswith("/settopic "):
+            topic = text[10:].strip()
+            await self._handle_settopic(topic)
+        elif text == "/create":
+            self.query_one("#status-bar", Static).update("Usage: /create <room name>")
         elif text == "/clear":
             self._handle_clear()
         elif self.current_room:
@@ -379,6 +390,36 @@ class MatrixApp(App):
         ok = await self._client.kick_user(self.current_room, user_id)
         status.update(f"Kicked {user_id}" if ok else f"Failed to kick {user_id}")
 
+    async def _handle_ban(self, user_id: str) -> None:
+        if not self.current_room or not user_id:
+            return
+        status = self.query_one("#status-bar", Static)
+        ok = await self._client.ban_user(self.current_room, user_id)
+        status.update(f"Banned {user_id}" if ok else f"Failed to ban {user_id}")
+
+    async def _handle_create(self, name: str) -> None:
+        if not name:
+            return
+        status = self.query_one("#status-bar", Static)
+        status.update(f"Creating room '{name}'…")
+        room_id = await self._client.create_room(name)
+        if room_id:
+            status.update(f"Created room {room_id}")
+            self._rebuild_room_list()
+        else:
+            status.update(f"Failed to create room '{name}'")
+
+    async def _handle_settopic(self, topic: str) -> None:
+        if not self.current_room or not topic:
+            return
+        status = self.query_one("#status-bar", Static)
+        ok = await self._client.set_room_topic(self.current_room, topic)
+        if ok:
+            status.update("Topic updated")
+            self.query_one("#messages", RichLog).write(f"[dim]Topic set to:[/dim] {topic}")
+        else:
+            status.update("Failed to set topic")
+
     def _handle_clear(self) -> None:
         self.query_one("#messages", RichLog).clear()
 
@@ -431,6 +472,9 @@ class MatrixApp(App):
         log.write("  /whois <@user:srv>      Show a user's display name and avatar")
         log.write("  /invite <@user:srv>     Invite a user to the current room")
         log.write("  /kick <@user:srv>       Kick a user from the current room")
+        log.write("  /ban <@user:srv>        Ban a user from the current room")
+        log.write("  /create <name>          Create a new room with the given name")
+        log.write("  /settopic <text>        Set the topic for the current room")
         log.write("  /clear                  Clear the message pane")
 
     def _handle_members(self) -> None:

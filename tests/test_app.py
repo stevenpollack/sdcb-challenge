@@ -1193,3 +1193,139 @@ async def test_sync_callback_delivers_message_to_active_room():
         await pilot.pause(0.2)
         assert len(log.lines) > before
         assert any("synced body" in str(line) for line in log.lines)
+
+
+# ------------------------------------------------------------------
+# /ban, /create, /settopic slash commands
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_ban_updates_status_on_success():
+    app, client = make_app()
+    client.ban_user = AsyncMock(return_value=True)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView, Static
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        import asyncio
+        await asyncio.ensure_future(app._handle_ban("@bad:m.org"))
+        await pilot.pause(0.1)
+        assert "Banned @bad:m.org" in str(app.query_one("#status-bar", Static).content)
+
+
+@pytest.mark.asyncio
+async def test_ban_updates_status_on_failure():
+    app, client = make_app()
+    client.ban_user = AsyncMock(return_value=False)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView, Static
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        import asyncio
+        await asyncio.ensure_future(app._handle_ban("@bad:m.org"))
+        await pilot.pause(0.1)
+        assert "Failed to ban" in str(app.query_one("#status-bar", Static).content)
+
+
+@pytest.mark.asyncio
+async def test_ban_no_room_noop():
+    app, client = make_app()
+    client.ban_user = AsyncMock(return_value=True)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        import asyncio
+        await asyncio.ensure_future(app._handle_ban("@bad:m.org"))
+        await pilot.pause(0.1)
+        client.ban_user.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_create_room_success_updates_status():
+    app, client = make_app()
+    client.create_room = AsyncMock(return_value="!new:m.org")
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import Static
+        import asyncio
+        await asyncio.ensure_future(app._handle_create("My New Room"))
+        await pilot.pause(0.1)
+        assert "Created room" in str(app.query_one("#status-bar", Static).content)
+
+
+@pytest.mark.asyncio
+async def test_create_room_failure_updates_status():
+    app, client = make_app()
+    client.create_room = AsyncMock(return_value=None)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import Static
+        import asyncio
+        await asyncio.ensure_future(app._handle_create("My New Room"))
+        await pilot.pause(0.1)
+        assert "Failed to create" in str(app.query_one("#status-bar", Static).content)
+
+
+@pytest.mark.asyncio
+async def test_create_room_empty_name_noop():
+    app, client = make_app()
+    client.create_room = AsyncMock(return_value="!new:m.org")
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        import asyncio
+        await asyncio.ensure_future(app._handle_create(""))
+        await pilot.pause(0.1)
+        client.create_room.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_settopic_success():
+    app, client = make_app()
+    client.set_room_topic = AsyncMock(return_value=True)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView, Static, RichLog
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        import asyncio
+        await asyncio.ensure_future(app._handle_settopic("Welcome here!"))
+        await pilot.pause(0.1)
+        assert "Topic updated" in str(app.query_one("#status-bar", Static).content)
+        log = app.query_one("#messages", RichLog)
+        assert any("Welcome here!" in str(line) for line in log.lines)
+
+
+@pytest.mark.asyncio
+async def test_settopic_failure():
+    app, client = make_app()
+    client.set_room_topic = AsyncMock(return_value=False)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView, Static
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        import asyncio
+        await asyncio.ensure_future(app._handle_settopic("some topic"))
+        await pilot.pause(0.1)
+        assert "Failed to set topic" in str(app.query_one("#status-bar", Static).content)
+
+
+@pytest.mark.asyncio
+async def test_settopic_no_room_noop():
+    app, client = make_app()
+    client.set_room_topic = AsyncMock(return_value=True)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        import asyncio
+        await asyncio.ensure_future(app._handle_settopic("some topic"))
+        await pilot.pause(0.1)
+        client.set_room_topic.assert_not_called()
