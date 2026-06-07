@@ -241,14 +241,51 @@ class MatrixApp(App):
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == "room-filter-input":
-            # Move focus to room list on Enter in filter
             self.query_one("#room-list", ListView).focus()
             return
         text = event.value.strip()
-        if not text or not self.current_room:
+        if not text:
             return
         event.input.clear()
-        await self._client.send_message(self.current_room, text)
+
+        # Slash commands
+        if text.startswith("/join "):
+            alias = text[6:].strip()
+            await self._handle_join(alias)
+        elif text.startswith("/leave"):
+            await self._handle_leave()
+        elif self.current_room:
+            await self._client.send_message(self.current_room, text)
+
+    async def _handle_join(self, room_id_or_alias: str) -> None:
+        status = self.query_one("#status-bar", Static)
+        status.update(f"Joining {room_id_or_alias}…")
+        room_id = await self._client.join_room(room_id_or_alias)
+        if room_id:
+            status.update(f"Joined {room_id_or_alias}")
+            # Trigger a sync to populate room
+            self._rebuild_room_list()
+        else:
+            status.update(f"Failed to join {room_id_or_alias}")
+
+    async def _handle_leave(self) -> None:
+        if not self.current_room:
+            return
+        room_id = self.current_room
+        status = self.query_one("#status-bar", Static)
+        ok = await self._client.leave_room(room_id)
+        if ok:
+            # Remove from UI
+            item = self._room_items.pop(room_id, None)
+            if item:
+                lv = self.query_one("#room-list", ListView)
+                await lv.remove_children(f"#{item.id}")
+            self.current_room = None
+            self.query_one("#room-title", Static).update("Select a room")
+            self.query_one("#messages", RichLog).clear()
+            status.update("Left room")
+        else:
+            status.update("Failed to leave room")
 
     # ------------------------------------------------------------------
     # Room list management
