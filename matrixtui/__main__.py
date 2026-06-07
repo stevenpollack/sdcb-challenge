@@ -5,6 +5,7 @@ import sys
 from .app import MatrixApp
 from .client import MatrixClient
 from .config import Config
+from .session import load_session
 
 
 def main() -> None:
@@ -20,6 +21,15 @@ def main() -> None:
         sys.exit(1)
 
     client = MatrixClient(cfg.homeserver, cfg.user_id)
+
+    # Try to restore a previous session to avoid re-login
+    saved = load_session()
+    if saved and saved.get("user_id") == cfg.user_id:
+        import asyncio
+        asyncio.get_event_loop().run_until_complete(
+            client.restore_session(saved["access_token"], saved.get("device_id", ""))
+        )
+
     app = MatrixApp(client)
     app.run()
 

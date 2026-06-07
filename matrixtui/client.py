@@ -94,6 +94,23 @@ class MatrixClient:
         if not isinstance(resp, LoginResponse):
             raise RuntimeError(f"Login failed: {resp}")
         logger.info("Logged in as %s", self.user_id)
+        # Persist session so next start can restore without re-login
+        try:
+            from .session import save_session
+            save_session(
+                self._client.homeserver,
+                self.user_id,
+                self._client.access_token,
+                self._client.device_id or "",
+            )
+        except Exception as exc:
+            logger.debug("Could not save session: %s", exc)
+
+    async def restore_session(self, access_token: str, device_id: str) -> None:
+        """Restore a previously saved session without re-authenticating."""
+        self._client.access_token = access_token
+        self._client.device_id = device_id
+        logger.info("Restored session for %s", self.user_id)
 
     async def logout(self) -> None:
         self._running = False
