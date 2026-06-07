@@ -44,7 +44,11 @@ yours.
 - `eval.meta.json` at the repo root, declaring report locations and formats, e.g.
   `{"coverage_report": "coverage-summary.json", "coverage_format": "jest-json-summary", "junit_report": "junit.xml"}`.
 - `FEATURES.md`: the honest feature ledger described above.
-- One commit per feature / unit of work; no giant squashed commits.
+- One commit per feature / unit of work; no giant squashed commits. Use Conventional Commits
+  prefixes on every commit subject: `feat:`, `fix:`, `refactor:`, `perf:`, `test:` for substantive
+  work, and `chore:`, `docs:`, `style:` for non-substantive work. The grader measures quality
+  trends across your substantive commits and excludes the non-substantive ones, so accurate
+  prefixes are in your interest — mislabeling feature work as `chore:` hides it from evaluation.
 - Tests present. **Zero tests = failure. No integration test = failure.**
 
 **Constraints:**
