@@ -42,6 +42,7 @@ class Message:
     timestamp: int  # milliseconds since epoch
     is_me: bool = False
     msgtype: str = "m.text"
+    mentions_me: bool = False  # True if body contains the local user's display name or MXID
 
 
 @dataclass
@@ -321,6 +322,12 @@ class MatrixClient:
         elif isinstance(event, RoomMessageNotice):
             msgtype = "m.notice"
 
+        local_part = self.user_id.split(":")[0].lstrip("@").lower()
+        body_lower = body.lower()
+        mentions = (
+            local_part in body_lower
+            or self.user_id.lower() in body_lower
+        )
         return Message(
             event_id=event.event_id,
             sender=event.sender,
@@ -328,6 +335,7 @@ class MatrixClient:
             timestamp=event.server_timestamp,
             is_me=(event.sender == self.user_id),
             msgtype=msgtype,
+            mentions_me=mentions and not (event.sender == self.user_id),
         )
 
     @staticmethod

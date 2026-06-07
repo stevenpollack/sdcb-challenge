@@ -259,6 +259,8 @@ class MatrixApp(App):
             self._handle_search(query)
         elif text.startswith("/members"):
             self._handle_members()
+        elif text.startswith("/help"):
+            self._handle_help()
         elif self.current_room:
             await self._client.send_message(self.current_room, text)
 
@@ -290,6 +292,24 @@ class MatrixApp(App):
             ts = datetime.fromtimestamp(msg.timestamp / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M")
             sender_short = msg.sender.split(":")[0].lstrip("@")
             log.write(f"[dim]{rname}[/dim] [{ts}] [bold]{sender_short}[/bold]: {msg.body}")
+
+    def _handle_help(self) -> None:
+        log = self.query_one("#messages", RichLog)
+        log.clear()
+        log.write("[bold]matrixtui — keyboard shortcuts & slash commands[/bold]")
+        log.write("")
+        log.write("[bold]Keyboard:[/bold]")
+        log.write("  Ctrl+F        Focus room filter")
+        log.write("  Ctrl+R        Load older message history")
+        log.write("  Ctrl+C        Quit")
+        log.write("  Esc           Focus message input")
+        log.write("")
+        log.write("[bold]Slash commands (type in message input):[/bold]")
+        log.write("  /help                   Show this help")
+        log.write("  /join #alias:server     Join a room by alias or ID")
+        log.write("  /leave                  Leave the current room")
+        log.write("  /search <query>         Search messages in current room")
+        log.write("  /members                List members of current room")
 
     def _handle_members(self) -> None:
         if not self.current_room:
@@ -374,8 +394,13 @@ class MatrixApp(App):
         ts = datetime.fromtimestamp(msg.timestamp / 1000, tz=timezone.utc).strftime("%H:%M")
         sender_short = msg.sender.split(":")[0].lstrip("@")
 
-        colour = _MSGTYPE_COLOUR.get(msg.msgtype, "cyan" if msg.is_me else "green")
-        line = f"[bold {colour}]{ts} {sender_short}[/bold {colour}]: {msg.body}"
+        if msg.mentions_me:
+            # Highlight the entire line for mentions
+            colour = "bold red on dark_red"
+            line = f"[{colour}]{ts} {sender_short}: {msg.body}[/{colour}]"
+        else:
+            colour = _MSGTYPE_COLOUR.get(msg.msgtype, "cyan" if msg.is_me else "green")
+            line = f"[bold {colour}]{ts} {sender_short}[/bold {colour}]: {msg.body}"
         log.write(line)
 
     # ------------------------------------------------------------------
