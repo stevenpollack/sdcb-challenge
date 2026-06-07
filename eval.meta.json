@@ -1,0 +1,5 @@
+{
+  "coverage_report": "coverage-summary.json",
+  "coverage_format": "jest-json-summary",
+  "junit_report": "junit.xml"
+}
