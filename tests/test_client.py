@@ -464,3 +464,149 @@ async def test_logout_cancels_sync_task():
     client._sync_task = asyncio.create_task(never_ending())
     await client.logout()
     assert client._sync_task.cancelled()
+
+
+# ------------------------------------------------------------------
+# Redactions
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_on_redaction_marks_message_redacted():
+    client = make_client()
+    client.rooms["!r:m.org"] = RoomSummary("!r:m.org", "Room")
+    client.messages["!r:m.org"] = [
+        Message("$evt1", "@a:m.org", "original body", 1000)
+    ]
+
+    room = MagicMock()
+    room.room_id = "!r:m.org"
+    event = MagicMock()
+    event.redacts = "$evt1"
+
+    await client._on_redaction(room, event)
+
+    msg = client.messages["!r:m.org"][0]
+    assert msg.body == "[redacted]"
+    assert msg.msgtype == "m.redacted"
+
+
+@pytest.mark.asyncio
+async def test_on_redaction_unknown_event_id_is_noop():
+    client = make_client()
+    client.rooms["!r:m.org"] = RoomSummary("!r:m.org", "Room")
+    client.messages["!r:m.org"] = [
+        Message("$evt1", "@a:m.org", "original body", 1000)
+    ]
+
+    room = MagicMock()
+    room.room_id = "!r:m.org"
+    event = MagicMock()
+    event.redacts = "$nonexistent"
+
+    await client._on_redaction(room, event)
+    # original message unchanged
+    assert client.messages["!r:m.org"][0].body == "original body"
+
+
+# ------------------------------------------------------------------
+# Message edits (m.replace)
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_on_unknown_event_handles_edit():
+    client = make_client()
+    client.rooms["!r:m.org"] = RoomSummary("!r:m.org", "Room")
+    client.messages["!r:m.org"] = [
+        Message("$original", "@a:m.org", "old text", 1000)
+    ]
+
+    room = MagicMock()
+    room.room_id = "!r:m.org"
+    event = MagicMock()
+    event.type = "m.room.message"
+    event.source = {
+        "content": {
+            "m.relates_to": {
+                "rel_type": "m.replace",
+                "event_id": "$original",
+            },
+            "m.new_content": {"body": "new text"},
+        }
+    }
+
+    await client._on_unknown_event(room, event)
+
+    msg = client.messages["!r:m.org"][0]
+    assert "new text" in msg.body
+    assert "[edited]" in msg.body
+
+
+@pytest.mark.asyncio
+async def test_on_unknown_event_ignores_non_message():
+    client = make_client()
+    room = MagicMock()
+    room.room_id = "!r:m.org"
+    event = MagicMock()
+    event.type = "m.reaction"
+    event.source = {}
+    # Should not raise, noop
+    await client._on_unknown_event(room, event)
+
+
+@pytest.mark.asyncio
+async def test_on_unknown_event_ignores_non_replace():
+    client = make_client()
+    room = MagicMock()
+    room.room_id = "!r:m.org"
+    event = MagicMock()
+    event.type = "m.room.message"
+    event.source = {"content": {"m.relates_to": {"rel_type": "m.thread"}}}
+    await client._on_unknown_event(room, event)
+
+
+# ------------------------------------------------------------------
+# join_room / leave_room
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_join_room_returns_room_id_on_success():
+    client = make_client()
+    from nio import JoinResponse
+    with patch.object(client._client, "join", new_callable=AsyncMock) as mock_join:
+        mock_join.return_value = MagicMock(spec=JoinResponse, room_id="!new:m.org")
+        result = await client.join_room("#alias:m.org")
+    assert result == "!new:m.org"
+
+
+@pytest.mark.asyncio
+async def test_join_room_returns_none_on_failure():
+    client = make_client()
+    with patch.object(client._client, "join", new_callable=AsyncMock) as mock_join:
+        mock_join.return_value = object()  # not JoinResponse
+        result = await client.join_room("#bad:m.org")
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_join_room_swallows_exceptions():
+    client = make_client()
+    with patch.object(
+        client._client, "join", new_callable=AsyncMock, side_effect=Exception("net error")
+    ):
+        result = await client.join_room("#bad:m.org")
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_leave_room_removes_from_state():
+    client = make_client()
+    client.rooms["!r:m.org"] = RoomSummary("!r:m.org", "Room")
+    client.messages["!r:m.org"] = []
+    # Mock a successful leave (response has transport_response attr)
+    leave_resp = MagicMock(spec=["transport_response"])
+    with patch.object(client._client, "room_leave", new_callable=AsyncMock) as mock_leave:
+        mock_leave.return_value = leave_resp
+        result = await client.leave_room("!r:m.org")
+    assert result is True
+    assert "!r:m.org" not in client.rooms
+    assert "!r:m.org" not in client.messages
