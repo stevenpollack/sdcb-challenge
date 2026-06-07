@@ -360,6 +360,10 @@ class MatrixApp(App):
             self._handle_mxcurl(mxc)
         elif text == "/stats":
             self._handle_stats()
+        elif text == "/myprofile":
+            await self._handle_myprofile()
+        elif text == "/canisend":
+            self._handle_canisend()
         elif text.startswith("/setavatar "):
             url = text[11:].strip()
             await self._handle_setavatar(url)
@@ -493,6 +497,28 @@ class MatrixApp(App):
             log.write(f"  → {http_url}")
         else:
             log.write(f"[dim]Could not convert {mxc}[/dim]")
+
+    async def _handle_myprofile(self) -> None:
+        log = self.query_one("#messages", RichLog)
+        profile = await self._client.get_own_profile()
+        if profile is None:
+            log.write("[dim]Could not fetch profile[/dim]")
+            return
+        display = profile.get("display_name") or "(not set)"
+        avatar = profile.get("avatar_url") or "(not set)"
+        log.write(f"[bold]{self._client.user_id}[/bold]")
+        log.write(f"  Display name: {display}")
+        log.write(f"  Avatar URL:   {avatar}")
+
+    def _handle_canisend(self) -> None:
+        if not self.current_room:
+            return
+        log = self.query_one("#messages", RichLog)
+        can = self._client.can_send_message(self.current_room)
+        if can:
+            log.write("[dim]You [bold green]can[/bold green] send messages in this room.[/dim]")
+        else:
+            log.write("[dim]You [bold red]cannot[/bold red] send messages in this room.[/dim]")
 
     def _handle_stats(self) -> None:
         stats = self._client.get_stats()
@@ -690,6 +716,8 @@ class MatrixApp(App):
         log.write("  /rename <name>          Rename the current room")
         log.write("  /joined                 Fetch live member list from server")
         log.write("  /mxcurl <mxc://>        Convert mxc:// media URI to HTTP download URL")
+        log.write("  /myprofile              Show your current display name and avatar from server")
+        log.write("  /canisend               Check if you can send messages in current room")
         log.write("  /stats                  Show local cache statistics")
         log.write("  /resolve #alias:srv     Resolve a room alias to its room ID")
         log.write("  /setavatar <mxc://>     Set your avatar to an mxc:// URI")

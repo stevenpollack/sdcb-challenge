@@ -1824,3 +1824,65 @@ def test_get_stats_with_data():
     assert stats["messages"] == 3
     assert stats["pending_invites"] == 1
     assert stats["typing_rooms"] == 1
+
+
+# ------------------------------------------------------------------
+# get_own_profile / can_send_message
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_get_own_profile_success():
+    from nio import ProfileGetDisplayNameResponse, ProfileGetAvatarResponse
+    client = make_client()
+    client._client.get_displayname = AsyncMock(
+        return_value=ProfileGetDisplayNameResponse("Alice")
+    )
+    client._client.get_avatar = AsyncMock(
+        return_value=ProfileGetAvatarResponse("mxc://m.org/abc")
+    )
+    result = await client.get_own_profile()
+    assert result is not None
+    assert result["display_name"] == "Alice"
+    assert result["avatar_url"] == "mxc://m.org/abc"
+
+
+@pytest.mark.asyncio
+async def test_get_own_profile_partial_failure():
+    from nio import ProfileGetDisplayNameResponse, ProfileGetDisplayNameError
+    client = make_client()
+    client._client.get_displayname = AsyncMock(
+        return_value=ProfileGetDisplayNameResponse("Alice")
+    )
+    client._client.get_avatar = AsyncMock(
+        return_value=ProfileGetDisplayNameError("not_found")
+    )
+    result = await client.get_own_profile()
+    assert result is not None
+    assert result["display_name"] == "Alice"
+    assert result["avatar_url"] is None
+
+
+@pytest.mark.asyncio
+async def test_get_own_profile_exception_returns_none():
+    client = make_client()
+    client._client.get_displayname = AsyncMock(side_effect=Exception("network"))
+    assert await client.get_own_profile() is None
+
+
+def test_can_send_message_true():
+    client = make_client()
+    client._client.has_permission = MagicMock(return_value=True)
+    assert client.can_send_message("!r:m.org") is True
+    client._client.has_permission.assert_called_once_with("!r:m.org", "send_message")
+
+
+def test_can_send_message_false():
+    client = make_client()
+    client._client.has_permission = MagicMock(return_value=False)
+    assert client.can_send_message("!r:m.org") is False
+
+
+def test_can_send_message_exception_returns_false():
+    client = make_client()
+    client._client.has_permission = MagicMock(side_effect=Exception("error"))
+    assert client.can_send_message("!r:m.org") is False

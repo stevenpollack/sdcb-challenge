@@ -57,6 +57,34 @@ def _static_text(widget) -> str:
     return str(widget.content)
 
 
+async def _select_first_room(pilot, app) -> None:
+    """Focus the room list and select the first entry."""
+    from textual.widgets import ListView
+    lv = app.query_one("#room-list", ListView)
+    lv.focus()
+    await pilot.press("down", "enter")
+    await pilot.pause(0.1)
+
+
+async def _run_handler(pilot, coro) -> None:
+    """Run an async handler coroutine inside the Textual event loop and wait."""
+    import asyncio
+    await asyncio.ensure_future(coro)
+    await pilot.pause(0.1)
+
+
+def _status(app) -> str:
+    """Return current status bar text."""
+    from textual.widgets import Static
+    return str(app.query_one("#status-bar", Static).content)
+
+
+def _log_lines(app) -> list:
+    """Return current message log lines."""
+    from textual.widgets import RichLog
+    return list(app.query_one("#messages", RichLog).lines)
+
+
 # ------------------------------------------------------------------
 # RoomListItem (pure logic, no pilot needed)
 # ------------------------------------------------------------------
@@ -1951,3 +1979,86 @@ async def test_stats_shows_counts():
         log = app.query_one("#messages", RichLog)
         assert any("Rooms" in str(line) for line in log.lines)
         assert any("Messages" in str(line) for line in log.lines)
+
+
+# ------------------------------------------------------------------
+# /myprofile and /canisend handlers
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_myprofile_shows_display_name_and_avatar():
+    app, client = make_app()
+    client.get_own_profile = AsyncMock(return_value={
+        "display_name": "Test User", "avatar_url": "mxc://m.org/xyz",
+    })
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import RichLog
+        import asyncio
+        await asyncio.ensure_future(app._handle_myprofile())
+        await pilot.pause(0.1)
+        log = app.query_one("#messages", RichLog)
+        assert any("Test User" in str(line) for line in log.lines)
+        assert any("Avatar URL" in str(line) for line in log.lines)
+
+
+@pytest.mark.asyncio
+async def test_myprofile_failure_shows_error():
+    app, client = make_app()
+    client.get_own_profile = AsyncMock(return_value=None)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import RichLog
+        import asyncio
+        await asyncio.ensure_future(app._handle_myprofile())
+        await pilot.pause(0.1)
+        log = app.query_one("#messages", RichLog)
+        assert any("Could not fetch" in str(line) for line in log.lines)
+
+
+@pytest.mark.asyncio
+async def test_canisend_true():
+    app, client = make_app()
+    client.can_send_message = MagicMock(return_value=True)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView, RichLog
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        app._handle_canisend()
+        await pilot.pause(0.1)
+        log = app.query_one("#messages", RichLog)
+        assert any("can" in str(line).lower() for line in log.lines)
+
+
+@pytest.mark.asyncio
+async def test_canisend_false():
+    app, client = make_app()
+    client.can_send_message = MagicMock(return_value=False)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView, RichLog
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        app._handle_canisend()
+        await pilot.pause(0.1)
+        log = app.query_one("#messages", RichLog)
+        assert any("cannot" in str(line).lower() for line in log.lines)
+
+
+@pytest.mark.asyncio
+async def test_canisend_no_room_noop():
+    app, client = make_app()
+    client.can_send_message = MagicMock(return_value=True)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import RichLog
+        log = app.query_one("#messages", RichLog)
+        before = len(log.lines)
+        app._handle_canisend()
+        await pilot.pause(0.1)
+        assert len(log.lines) == before

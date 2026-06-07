@@ -569,6 +569,37 @@ class MatrixClient:
         """Convert an mxc:// URI to an HTTP download URL."""
         return self._client.mxc_to_http(mxc_url)
 
+    async def get_own_profile(self) -> dict | None:
+        """Fetch own display name and avatar from server. Returns dict or None."""
+        try:
+            from nio import ProfileGetDisplayNameResponse, ProfileGetAvatarResponse
+            dn_resp = await self._client.get_displayname(self.user_id)
+            av_resp = await self._client.get_avatar(self.user_id)
+            display_name = (
+                dn_resp.displayname
+                if isinstance(dn_resp, ProfileGetDisplayNameResponse)
+                else None
+            )
+            avatar_url = (
+                av_resp.avatar_url
+                if isinstance(av_resp, ProfileGetAvatarResponse)
+                else None
+            )
+            return {"display_name": display_name, "avatar_url": avatar_url}
+        except Exception as exc:
+            logger.warning("get_own_profile error: %s", exc)
+        return None
+
+    def can_send_message(self, room_id: str) -> bool:
+        """Return True if the current user has permission to send messages in room_id."""
+        try:
+            result = self._client.has_permission(room_id, "send_message")
+            if isinstance(result, bool):
+                return result
+        except Exception as exc:
+            logger.warning("can_send_message error: %s", exc)
+        return False
+
     def get_stats(self) -> dict:
         """Return local cache statistics."""
         total_msgs = sum(len(msgs) for msgs in self.messages.values())

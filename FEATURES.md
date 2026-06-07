@@ -57,3 +57,5 @@ more heavily than an accurate `partial` or `broken`.
 | Live member list | working | /joined fetches current room members live from server (vs. cached /members) |
 | Media URL conversion | working | /mxcurl <mxc://> converts a Matrix media URI to an HTTP download URL |
 | Local cache stats | working | /stats shows rooms loaded, messages cached, pending invites, and active typists |
+| Own profile lookup | working | /myprofile fetches your current display name and avatar from the server |
+| Send permission check | working | /canisend shows whether you have permission to send messages in current room |
