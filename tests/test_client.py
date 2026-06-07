@@ -551,6 +551,7 @@ async def test_on_redaction_unknown_event_id_is_noop():
 
 @pytest.mark.asyncio
 async def test_on_unknown_event_handles_edit():
+    """_on_unknown_event still handles edits from truly unknown event types."""
     client = make_client()
     client.rooms["!r:m.org"] = RoomSummary("!r:m.org", "Room")
     client.messages["!r:m.org"] = [
@@ -576,6 +577,45 @@ async def test_on_unknown_event_handles_edit():
     msg = client.messages["!r:m.org"][0]
     assert "new text" in msg.body
     assert "[edited]" in msg.body
+
+
+@pytest.mark.asyncio
+async def test_on_room_message_handles_edit_via_relates_to():
+    """Edits arriving as RoomMessageText with m.relates_to should update in-place."""
+    client = make_client()
+    from nio import RoomMessageText
+    client.rooms["!r:m.org"] = RoomSummary("!r:m.org", "Room")
+    client.messages["!r:m.org"] = [
+        Message("$original", "@a:m.org", "old text", 1000)
+    ]
+
+    room = MagicMock()
+    room.room_id = "!r:m.org"
+    event = MagicMock(spec=RoomMessageText)
+    event.event_id = "$edit_evt"
+    event.sender = "@a:m.org"
+    event.body = "* new text"
+    event.server_timestamp = 2000
+    event.source = {
+        "content": {
+            "msgtype": "m.text",
+            "body": "* new text",
+            "m.relates_to": {
+                "rel_type": "m.replace",
+                "event_id": "$original",
+            },
+            "m.new_content": {"body": "new text"},
+        }
+    }
+
+    await client._on_room_message(room, event)
+
+    msgs = client.messages["!r:m.org"]
+    # Edit must NOT add a new message
+    assert len(msgs) == 1
+    assert msgs[0].event_id == "$original"
+    assert "new text" in msgs[0].body
+    assert "[edited]" in msgs[0].body
 
 
 @pytest.mark.asyncio

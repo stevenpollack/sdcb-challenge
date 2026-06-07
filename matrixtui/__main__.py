@@ -25,10 +25,7 @@ def main() -> None:
     # Try to restore a previous session to avoid re-login
     saved = load_session()
     if saved and saved.get("user_id") == cfg.user_id:
-        import asyncio
-        asyncio.get_event_loop().run_until_complete(
-            client.restore_session(saved["access_token"], saved.get("device_id", ""))
-        )
+        client.restore_session(saved["access_token"], saved.get("device_id", ""))
 
     app = MatrixApp(client)
     app.run()

@@ -305,7 +305,6 @@ class MatrixApp(App):
         for room_id, msg in results:
             room_name = self._client.rooms.get(room_id, None)
             rname = room_name.display_name if room_name else room_id
-            from datetime import datetime, timezone
             ts = datetime.fromtimestamp(
                 msg.timestamp / 1000, tz=timezone.utc
             ).strftime("%Y-%m-%d %H:%M")
@@ -350,8 +349,7 @@ class MatrixApp(App):
             # Remove from UI
             item = self._room_items.pop(room_id, None)
             if item:
-                lv = self.query_one("#room-list", ListView)
-                await lv.remove_children(f"#{item.id}")
+                await item.remove()
             self.current_room = None
             self.query_one("#room-title", Static).update("Select a room")
             self.query_one("#messages", RichLog).clear()
@@ -370,6 +368,7 @@ class MatrixApp(App):
             key=lambda r: r.last_ts,
             reverse=True,
         )
+        # Create any new items first
         for summary in rooms:
             if summary.room_id not in self._room_items:
                 item = RoomListItem(summary)
@@ -377,6 +376,10 @@ class MatrixApp(App):
                 lv.append(item)
             else:
                 self._room_items[summary.room_id].refresh_text()
+        # Re-order widgets to match sorted order
+        for i, summary in enumerate(rooms):
+            item = self._room_items[summary.room_id]
+            lv.move_child(item, before=i)
         self._apply_filter()
 
     def _apply_filter(self) -> None:

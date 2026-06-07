@@ -108,7 +108,7 @@ class MatrixClient:
         except Exception as exc:
             logger.debug("Could not save session: %s", exc)
 
-    async def restore_session(self, access_token: str, device_id: str) -> None:
+    def restore_session(self, access_token: str, device_id: str) -> None:
         """Restore a previously saved session without re-authenticating."""
         self._client.access_token = access_token
         self._client.device_id = device_id
@@ -182,6 +182,21 @@ class MatrixClient:
     # ------------------------------------------------------------------
 
     async def _on_room_message(self, room: MatrixRoom, event: RoomMessage) -> None:
+        # Detect m.replace edits sent as RoomMessageText with m.relates_to in source
+        content = getattr(event, "source", {}).get("content", {})
+        relates = content.get("m.relates_to", {})
+        if relates.get("rel_type") == "m.replace":
+            new_body = content.get("m.new_content", {}).get("body", "")
+            replaces_id = relates.get("event_id")
+            msgs = self.messages.get(room.room_id, [])
+            for existing in msgs:
+                if existing.event_id == replaces_id:
+                    existing.body = f"{new_body} [edited]"
+                    break
+            for cb in self._on_room_update:
+                cb(room.room_id)
+            return
+
         msg = self._event_to_message(event)
         msgs = self.messages.setdefault(room.room_id, [])
         if not any(m.event_id == msg.event_id for m in msgs):
