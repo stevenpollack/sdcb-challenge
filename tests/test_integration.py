@@ -77,16 +77,27 @@ def test_rooms_have_display_names():
 
 
 def test_send_message_returns_event_id():
-    """Send a message to the first available room and verify event_id returned."""
+    """Send a message to a writable room and verify event_id returned.
+
+    Tries each room in turn until one accepts the message (some rooms have
+    power-level restrictions that forbid posting).
+    """
     if not _has_credentials():
         pytest.skip("No Matrix credentials in environment")
     client = _shared["client"]
     loop = _shared["loop"]
     if not client.rooms:
         pytest.skip("No rooms available")
-    room_id = next(iter(client.rooms))
-    event_id = loop.run_until_complete(
-        client.send_message(room_id, "matrixtui integration test ping")
+
+    event_id = None
+    for room_id in client.rooms:
+        event_id = loop.run_until_complete(
+            client.send_message(room_id, "matrixtui integration test ping")
+        )
+        if event_id is not None:
+            break
+
+    assert event_id is not None, (
+        "send_message should return an event_id from at least one room"
     )
-    assert event_id is not None, "send_message should return an event_id"
     assert event_id.startswith("$"), f"Unexpected event_id format: {event_id}"
