@@ -254,6 +254,11 @@ class MatrixApp(App):
             await self._handle_join(alias)
         elif text.startswith("/leave"):
             await self._handle_leave()
+        elif text.startswith("/search "):
+            query = text[8:].strip()
+            self._handle_search(query)
+        elif text.startswith("/members"):
+            self._handle_members()
         elif self.current_room:
             await self._client.send_message(self.current_room, text)
 
@@ -267,6 +272,34 @@ class MatrixApp(App):
             self._rebuild_room_list()
         else:
             status.update(f"Failed to join {room_id_or_alias}")
+
+    def _handle_search(self, query: str) -> None:
+        if not query:
+            return
+        results = self._client.search_messages(query, room_id=self.current_room)
+        log = self.query_one("#messages", RichLog)
+        log.clear()
+        if not results:
+            log.write(f"[dim]No results for '{query}'[/dim]")
+            return
+        log.write(f"[dim]Search results for '{query}' ({len(results)} found):[/dim]")
+        for room_id, msg in results:
+            room_name = self._client.rooms.get(room_id, None)
+            rname = room_name.display_name if room_name else room_id
+            from datetime import datetime, timezone
+            ts = datetime.fromtimestamp(msg.timestamp / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M")
+            sender_short = msg.sender.split(":")[0].lstrip("@")
+            log.write(f"[dim]{rname}[/dim] [{ts}] [bold]{sender_short}[/bold]: {msg.body}")
+
+    def _handle_members(self) -> None:
+        if not self.current_room:
+            return
+        members = self._client.get_room_members(self.current_room)
+        log = self.query_one("#messages", RichLog)
+        log.clear()
+        log.write(f"[dim]Members ({len(members)}):[/dim]")
+        for user_id in sorted(members):
+            log.write(f"  {user_id}")
 
     async def _handle_leave(self) -> None:
         if not self.current_room:

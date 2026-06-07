@@ -344,6 +344,29 @@ class MatrixClient:
             return non_self[0]
         return room.room_id
 
+    def search_messages(self, query: str, room_id: str | None = None) -> list[tuple[str, Message]]:
+        """Search loaded messages for a query string (case-insensitive).
+
+        Returns a list of (room_id, Message) pairs sorted by timestamp.
+        Pass room_id to restrict search to one room.
+        """
+        query_lower = query.lower()
+        results: list[tuple[str, Message]] = []
+        rooms_to_search = [room_id] if room_id else list(self.messages.keys())
+        for rid in rooms_to_search:
+            for msg in self.messages.get(rid, []):
+                if query_lower in msg.body.lower() or query_lower in msg.sender.lower():
+                    results.append((rid, msg))
+        results.sort(key=lambda x: x[1].timestamp)
+        return results
+
+    def get_room_members(self, room_id: str) -> list[str]:
+        """Return a list of user_ids currently in a room (from nio state)."""
+        nio_room = self._client.rooms.get(room_id)
+        if nio_room is None:
+            return []
+        return list(nio_room.users.keys())
+
     def on_room_update(self, cb: Callable[[str], None]) -> None:
         self._on_room_update.append(cb)
 
