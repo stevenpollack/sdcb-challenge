@@ -1504,3 +1504,105 @@ def test_get_user_power_level_room_not_found():
     client = make_client()
     client._client.rooms = {}
     assert client.get_user_power_level("!missing:m.org") is None
+
+
+# ------------------------------------------------------------------
+# create_direct_message / set_presence / rename_room
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_create_direct_message_success():
+    from nio import RoomCreateResponse
+    client = make_client()
+    client._client.room_create = AsyncMock(return_value=RoomCreateResponse("!dm:m.org"))
+    room_id = await client.create_direct_message("@bob:m.org")
+    assert room_id == "!dm:m.org"
+    call = client._client.room_create.call_args
+    assert call.kwargs["is_direct"] is True
+    assert "@bob:m.org" in call.kwargs["invite"]
+
+
+@pytest.mark.asyncio
+async def test_create_direct_message_failure_returns_none():
+    from nio import RoomCreateError
+    client = make_client()
+    client._client.room_create = AsyncMock(return_value=RoomCreateError("forbidden"))
+    assert await client.create_direct_message("@bob:m.org") is None
+
+
+@pytest.mark.asyncio
+async def test_create_direct_message_exception_returns_none():
+    client = make_client()
+    client._client.room_create = AsyncMock(side_effect=Exception("network"))
+    assert await client.create_direct_message("@bob:m.org") is None
+
+
+@pytest.mark.asyncio
+async def test_set_presence_online_success():
+    from nio import PresenceSetResponse
+    client = make_client()
+    client._client.set_presence = AsyncMock(return_value=PresenceSetResponse())
+    assert await client.set_presence("online") is True
+    client._client.set_presence.assert_called_once_with("online", None)
+
+
+@pytest.mark.asyncio
+async def test_set_presence_with_status_msg():
+    from nio import PresenceSetResponse
+    client = make_client()
+    client._client.set_presence = AsyncMock(return_value=PresenceSetResponse())
+    await client.set_presence("unavailable", "In a meeting")
+    client._client.set_presence.assert_called_once_with("unavailable", "In a meeting")
+
+
+@pytest.mark.asyncio
+async def test_set_presence_invalid_value_returns_false():
+    client = make_client()
+    client._client.set_presence = AsyncMock()
+    assert await client.set_presence("invisible") is False
+    client._client.set_presence.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_set_presence_failure_returns_false():
+    from nio import PresenceSetError
+    client = make_client()
+    client._client.set_presence = AsyncMock(return_value=PresenceSetError("forbidden"))
+    assert await client.set_presence("online") is False
+
+
+@pytest.mark.asyncio
+async def test_set_presence_exception_returns_false():
+    client = make_client()
+    client._client.set_presence = AsyncMock(side_effect=Exception("network"))
+    assert await client.set_presence("online") is False
+
+
+@pytest.mark.asyncio
+async def test_rename_room_success():
+    from nio import RoomPutStateResponse
+    client = make_client()
+    client._client.room_put_state = AsyncMock(
+        return_value=RoomPutStateResponse("$ev", "!r:m.org")
+    )
+    assert await client.rename_room("!r:m.org", "New Name") is True
+    client._client.room_put_state.assert_called_once_with(
+        "!r:m.org", "m.room.name", {"name": "New Name"}
+    )
+
+
+@pytest.mark.asyncio
+async def test_rename_room_failure_returns_false():
+    from nio import RoomPutStateError
+    client = make_client()
+    client._client.room_put_state = AsyncMock(
+        return_value=RoomPutStateError("forbidden")
+    )
+    assert await client.rename_room("!r:m.org", "New Name") is False
+
+
+@pytest.mark.asyncio
+async def test_rename_room_exception_returns_false():
+    client = make_client()
+    client._client.room_put_state = AsyncMock(side_effect=Exception("network"))
+    assert await client.rename_room("!r:m.org", "New Name") is False

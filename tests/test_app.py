@@ -1532,3 +1532,131 @@ async def test_logout_status_bar_updates():
             await asyncio.ensure_future(app._handle_logout())
             await pilot.pause(0.1)
             assert "Logging out" in str(app.query_one("#status-bar", Static).content)
+
+
+# ------------------------------------------------------------------
+# /dm, /presence, /rename handlers
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_dm_success_updates_status():
+    app, client = make_app()
+    client.create_direct_message = AsyncMock(return_value="!dm:m.org")
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import Static
+        import asyncio
+        await asyncio.ensure_future(app._handle_dm("@bob:m.org"))
+        await pilot.pause(0.1)
+        assert "DM room created" in str(app.query_one("#status-bar", Static).content)
+
+
+@pytest.mark.asyncio
+async def test_dm_failure_updates_status():
+    app, client = make_app()
+    client.create_direct_message = AsyncMock(return_value=None)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import Static
+        import asyncio
+        await asyncio.ensure_future(app._handle_dm("@bob:m.org"))
+        await pilot.pause(0.1)
+        assert "Failed to open DM" in str(app.query_one("#status-bar", Static).content)
+
+
+@pytest.mark.asyncio
+async def test_dm_empty_user_noop():
+    app, client = make_app()
+    client.create_direct_message = AsyncMock(return_value="!dm:m.org")
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        import asyncio
+        await asyncio.ensure_future(app._handle_dm(""))
+        await pilot.pause(0.1)
+        client.create_direct_message.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_presence_valid_updates_status():
+    app, client = make_app()
+    client.set_presence = AsyncMock(return_value=True)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import Static
+        import asyncio
+        await asyncio.ensure_future(app._handle_presence("online"))
+        await pilot.pause(0.1)
+        assert "Presence set to online" in str(app.query_one("#status-bar", Static).content)
+
+
+@pytest.mark.asyncio
+async def test_presence_invalid_shows_error():
+    app, client = make_app()
+    client.set_presence = AsyncMock(return_value=False)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import Static
+        import asyncio
+        await asyncio.ensure_future(app._handle_presence("invisible"))
+        await pilot.pause(0.1)
+        status = str(app.query_one("#status-bar", Static).content)
+        assert "Unknown presence" in status or "invisible" in status
+
+
+@pytest.mark.asyncio
+async def test_presence_failure_updates_status():
+    app, client = make_app()
+    client.set_presence = AsyncMock(return_value=False)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import Static
+        import asyncio
+        await asyncio.ensure_future(app._handle_presence("offline"))
+        await pilot.pause(0.1)
+        assert "Failed to set presence" in str(app.query_one("#status-bar", Static).content)
+
+
+@pytest.mark.asyncio
+async def test_rename_success():
+    app, client = make_app()
+    client.rename_room = AsyncMock(return_value=True)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView, Static
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        import asyncio
+        await asyncio.ensure_future(app._handle_rename("My Cool Room"))
+        await pilot.pause(0.1)
+        assert "renamed" in str(app.query_one("#status-bar", Static).content).lower()
+
+
+@pytest.mark.asyncio
+async def test_rename_failure():
+    app, client = make_app()
+    client.rename_room = AsyncMock(return_value=False)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView, Static
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        import asyncio
+        await asyncio.ensure_future(app._handle_rename("My Cool Room"))
+        await pilot.pause(0.1)
+        assert "Failed to rename" in str(app.query_one("#status-bar", Static).content)
+
+
+@pytest.mark.asyncio
+async def test_rename_no_room_noop():
+    app, client = make_app()
+    client.rename_room = AsyncMock(return_value=True)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        import asyncio
+        await asyncio.ensure_future(app._handle_rename("New Name"))
+        await pilot.pause(0.1)
+        client.rename_room.assert_not_called()

@@ -338,6 +338,15 @@ class MatrixApp(App):
             self.query_one("#status-bar", Static).update("Usage: /create <room name>")
         elif text == "/logout":
             await self._handle_logout()
+        elif text.startswith("/dm "):
+            target = text[4:].strip()
+            await self._handle_dm(target)
+        elif text.startswith("/presence "):
+            state = text[10:].strip()
+            await self._handle_presence(state)
+        elif text.startswith("/rename "):
+            name = text[8:].strip()
+            await self._handle_rename(name)
         elif text == "/clear":
             self._handle_clear()
         elif self.current_room:
@@ -414,6 +423,40 @@ class MatrixApp(App):
         status = self.query_one("#status-bar", Static)
         ok = await self._client.unban_user(self.current_room, user_id)
         status.update(f"Unbanned {user_id}" if ok else f"Failed to unban {user_id}")
+
+    async def _handle_dm(self, user_id: str) -> None:
+        if not user_id:
+            return
+        status = self.query_one("#status-bar", Static)
+        status.update(f"Opening DM with {user_id}…")
+        room_id = await self._client.create_direct_message(user_id)
+        if room_id:
+            status.update(f"DM room created: {room_id}")
+            self._rebuild_room_list()
+        else:
+            status.update(f"Failed to open DM with {user_id}")
+
+    async def _handle_presence(self, state: str) -> None:
+        valid = {"online", "offline", "unavailable"}
+        if state not in valid:
+            self.query_one("#status-bar", Static).update(
+                f"Unknown presence '{state}' — use: online, offline, unavailable"
+            )
+            return
+        ok = await self._client.set_presence(state)
+        self.query_one("#status-bar", Static).update(
+            f"Presence set to {state}" if ok else "Failed to set presence"
+        )
+
+    async def _handle_rename(self, name: str) -> None:
+        if not self.current_room or not name:
+            return
+        status = self.query_one("#status-bar", Static)
+        ok = await self._client.rename_room(self.current_room, name)
+        if ok:
+            status.update(f"Room renamed to '{name}'")
+        else:
+            status.update("Failed to rename room")
 
     async def _handle_logout(self) -> None:
         status = self.query_one("#status-bar", Static)
@@ -531,6 +574,9 @@ class MatrixApp(App):
         log.write("  /unban <@user:srv>      Unban a user from the current room")
         log.write("  /react <emoji>          React to the last message in current room")
         log.write("  /powerlevel [<@user>]   Show power level of self or a given user")
+        log.write("  /dm <@user:srv>         Open a direct message room with a user")
+        log.write("  /presence <state>       Set presence: online, offline, unavailable")
+        log.write("  /rename <name>          Rename the current room")
         log.write("  /logout                 Log out and clear saved session")
         log.write("  /create <name>          Create a new room with the given name")
         log.write("  /settopic <text>        Set the topic for the current room")

@@ -45,3 +45,6 @@ more heavily than an accurate `partial` or `broken`.
 | Message reactions | working | /react <emoji> sends m.reaction (m.annotation) targeting the last visible message |
 | Power level display | working | /powerlevel [<@user>] shows numeric power level and role (Admin/Moderator) from room state |
 | Logout | working | /logout invalidates server session, clears ~/.config/matrixtui/session.json, and exits |
+| Direct message | working | /dm <@user:srv> creates a private is_direct=True room and invites the target user |
+| Presence control | working | /presence online|offline|unavailable sets global Matrix presence |
+| Rename room | working | /rename <name> updates current room's m.room.name state event |

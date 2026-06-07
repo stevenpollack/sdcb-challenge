@@ -14,7 +14,7 @@ from nio import (
     LoginResponse,
     MatrixRoom,
     MessageDirection,
-    RedactionEvent,
+    PresenceSetResponse,
     RoomBanResponse,
     RoomCreateResponse,
     RoomInviteResponse,
@@ -31,6 +31,7 @@ from nio import (
     RoomPutStateResponse,
     RoomSendResponse,
     RoomUnbanResponse,
+    RedactionEvent,
     SyncResponse,
     TypingNoticeEvent,
     UnknownEvent,
@@ -516,6 +517,45 @@ class MatrixClient:
         except Exception as exc:
             logger.warning("create_room error: %s", exc)
         return None
+
+    async def create_direct_message(self, user_id: str) -> str | None:
+        """Create a direct message room with user_id. Returns room_id on success."""
+        try:
+            from nio import RoomPreset, RoomVisibility
+            resp = await self._client.room_create(
+                visibility=RoomVisibility.private,
+                preset=RoomPreset.private_chat,
+                is_direct=True,
+                invite=[user_id],
+            )
+            if isinstance(resp, RoomCreateResponse):
+                return resp.room_id
+        except Exception as exc:
+            logger.warning("create_direct_message error: %s", exc)
+        return None
+
+    async def set_presence(self, presence: str, status_msg: str = "") -> bool:
+        """Set user presence: 'online', 'offline', or 'unavailable'."""
+        valid = {"online", "offline", "unavailable"}
+        if presence not in valid:
+            return False
+        try:
+            resp = await self._client.set_presence(presence, status_msg or None)
+            return isinstance(resp, PresenceSetResponse)
+        except Exception as exc:
+            logger.warning("set_presence error: %s", exc)
+        return False
+
+    async def rename_room(self, room_id: str, name: str) -> bool:
+        """Set the display name of a room via m.room.name state event."""
+        try:
+            resp = await self._client.room_put_state(
+                room_id, "m.room.name", {"name": name}
+            )
+            return isinstance(resp, RoomPutStateResponse)
+        except Exception as exc:
+            logger.warning("rename_room error: %s", exc)
+        return False
 
     async def set_room_topic(self, room_id: str, topic: str) -> bool:
         """Set the topic for a room. Returns True on success."""
