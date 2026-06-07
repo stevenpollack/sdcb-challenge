@@ -1006,3 +1006,168 @@ async def test_set_display_name_swallows_exception():
     ):
         result = await client.set_display_name("Alice")
     assert result is False
+
+
+# ------------------------------------------------------------------
+# restore_session (sync)
+# ------------------------------------------------------------------
+
+def test_restore_session_sets_token_and_device():
+    client = make_client()
+    client.restore_session("tok_abc", "DEV1")
+    assert client._client.access_token == "tok_abc"
+    assert client._client.device_id == "DEV1"
+
+
+# ------------------------------------------------------------------
+# room_update callback coverage: message/redaction/unknown paths
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_on_room_message_fires_room_update_callback():
+    """room_update callback must fire on new message (line 212)."""
+    client = make_client()
+    from nio import RoomMessageText
+    client.rooms["!r:m.org"] = RoomSummary("!r:m.org", "Room")
+    client.messages["!r:m.org"] = []
+    ru_cb = MagicMock()
+    client.on_room_update(ru_cb)
+
+    room = MagicMock()
+    room.room_id = "!r:m.org"
+    event = make_event(cls=RoomMessageText)
+    await client._on_room_message(room, event)
+
+    ru_cb.assert_called_with("!r:m.org")
+
+
+@pytest.mark.asyncio
+async def test_on_room_message_edit_fires_room_update_callback():
+    """room_update callback must fire on edit path (line 197)."""
+    client = make_client()
+    from nio import RoomMessageText
+    client.rooms["!r:m.org"] = RoomSummary("!r:m.org", "Room")
+    client.messages["!r:m.org"] = [Message("$orig", "@a:m.org", "old", 1000)]
+    ru_cb = MagicMock()
+    client.on_room_update(ru_cb)
+
+    room = MagicMock()
+    room.room_id = "!r:m.org"
+    event = MagicMock(spec=RoomMessageText)
+    event.event_id = "$edit"
+    event.sender = "@a:m.org"
+    event.body = "* new"
+    event.server_timestamp = 2000
+    event.source = {
+        "content": {
+            "m.relates_to": {"rel_type": "m.replace", "event_id": "$orig"},
+            "m.new_content": {"body": "new"},
+        }
+    }
+    await client._on_room_message(room, event)
+    ru_cb.assert_called_with("!r:m.org")
+
+
+@pytest.mark.asyncio
+async def test_on_redaction_fires_room_update_callback():
+    """room_update callback must fire after redaction (line 235)."""
+    client = make_client()
+    client.rooms["!r:m.org"] = RoomSummary("!r:m.org", "Room")
+    client.messages["!r:m.org"] = [Message("$e", "@a:m.org", "body", 1000)]
+    ru_cb = MagicMock()
+    client.on_room_update(ru_cb)
+
+    room = MagicMock()
+    room.room_id = "!r:m.org"
+    event = MagicMock()
+    event.redacts = "$e"
+    await client._on_redaction(room, event)
+    ru_cb.assert_called_with("!r:m.org")
+
+
+@pytest.mark.asyncio
+async def test_on_unknown_event_edit_fires_room_update_callback():
+    """room_update callback must fire in _on_unknown_event edit path (line 254)."""
+    client = make_client()
+    client.rooms["!r:m.org"] = RoomSummary("!r:m.org", "Room")
+    client.messages["!r:m.org"] = [Message("$orig", "@a:m.org", "old", 1000)]
+    ru_cb = MagicMock()
+    client.on_room_update(ru_cb)
+
+    room = MagicMock()
+    room.room_id = "!r:m.org"
+    event = MagicMock()
+    event.type = "m.room.message"
+    event.source = {
+        "content": {
+            "m.relates_to": {"rel_type": "m.replace", "event_id": "$orig"},
+            "m.new_content": {"body": "updated"},
+        }
+    }
+    await client._on_unknown_event(room, event)
+    ru_cb.assert_called_with("!r:m.org")
+
+
+# ------------------------------------------------------------------
+# _sync_loop error recovery
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_sync_loop_recovers_from_exception():
+    """_sync_loop logs errors and continues (lines 152-154)."""
+    client = make_client()
+    call_count = 0
+
+    async def failing_then_stop(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise RuntimeError("transient error")
+        # Stop the loop after second call
+        client._running = False
+        from nio import SyncResponse
+        return MagicMock(spec=SyncResponse)
+
+    client._client.sync = failing_then_stop
+    client._client.rooms = {}
+    client._running = True
+
+    with patch("matrixtui.client.asyncio.sleep", new_callable=AsyncMock):
+        await client._sync_loop()
+
+    assert call_count == 2  # ran twice: first failed, second stopped loop
+
+
+@pytest.mark.asyncio
+async def test_sync_loop_breaks_on_cancelled():
+    """_sync_loop exits cleanly on CancelledError (line 151)."""
+    import asyncio
+    client = make_client()
+
+    async def cancel_immediately(*args, **kwargs):
+        raise asyncio.CancelledError()
+
+    client._client.sync = cancel_immediately
+    client._running = True
+    await client._sync_loop()  # should return without raising
+    # If we get here, the break worked correctly
+
+
+@pytest.mark.asyncio
+async def test_on_room_name_fires_room_update_callback():
+    """room_update callback fires when room name changes (line 219)."""
+    client = make_client()
+    client.rooms["!r:m.org"] = RoomSummary("!r:m.org", "Old")
+    ru_cb = MagicMock()
+    client.on_room_update(ru_cb)
+
+    room = MagicMock()
+    room.room_id = "!r:m.org"
+    room.display_name = "New Name"
+    room.name = None
+    room.users = {}
+    room.own_user_id = "@me:m.org"
+    event = MagicMock()
+    await client._on_room_name(room, event)
+
+    ru_cb.assert_called_once_with("!r:m.org")
