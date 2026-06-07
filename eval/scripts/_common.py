@@ -4,7 +4,7 @@ import os
 import subprocess
 import sys
 from fnmatch import fnmatch
-
+import re
 
 def load_config(path="eval.config.json"):
     if not os.path.exists(path):
@@ -41,7 +41,9 @@ def feature_commits(repo, cfg):
     fc = cfg.get("feature_commits", {"mode": "all"})
     if fc.get("mode") == "all":
         return commits
-    import re
+    if fc.get("mode") == "exclude":
+        rx = re.compile(fc["exclude_regex"])
+        return [(s, subj) for (s, subj) in commits if not rx.search(subj)]
     rx = re.compile(fc["subject_regex"])
     return [(s, subj) for (s, subj) in commits if rx.search(subj)]
 

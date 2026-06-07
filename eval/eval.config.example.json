@@ -1,9 +1,10 @@
 {
   "repo_path": ".",
-  "_comment_feature_commits": "How to identify per-feature commits for trend metrics. regex matched against commit subjects, or 'mode':'all' to use every commit.",
+  "_comment_feature_commits": "Which commits count for trend metrics. mode 'exclude' counts everything EXCEPT subjects matching exclude_regex (chore/docs/style/revert/merge \u2014 non-substantive). mode 'regex' (subject_regex) is the inverse allowlist. mode 'all' counts every commit.",
   "feature_commits": {
-    "mode": "regex",
-    "subject_regex": "^(feat|feature)(\\(.+\\))?:"
+    "mode": "exclude",
+    "exclude_regex": "^(chore|docs|style|revert)(\\(.+\\))?:|^Merge ",
+    "_unused_subject_regex": "^(feat|fix|refactor|perf|test)(\\(.+\\))?:"
   },
   "_comment_make": "The model must provide these targets (see PROMPT.md). The harness calls them; you normally do not edit this. Override only if a run's Makefile deviates.",
   "make": {
