@@ -9,6 +9,8 @@ from typing import Callable
 from nio import (
     AsyncClient,
     AsyncClientConfig,
+    InviteEvent,
+    InviteMemberEvent,
     JoinResponse,
     LoginResponse,
     MatrixRoom,
@@ -72,10 +74,12 @@ class MatrixClient:
         self.rooms: dict[str, RoomSummary] = {}
         self.messages: dict[str, list[Message]] = {}
         self.typing_users: dict[str, list[str]] = {}
+        self.invites: dict[str, str] = {}  # room_id -> inviter user_id
         self._sync_task: asyncio.Task | None = None
         self._on_room_update: list[Callable[[str], None]] = []
         self._on_message: list[Callable[[str, Message], None]] = []
         self._on_typing: list[Callable[[str, list[str]], None]] = []
+        self._on_invite: list[Callable[[str, str], None]] = []
         self._running = False
 
         # RoomMessage matches all subtypes (Text, Image, File, Emote, Notice, …)
@@ -84,6 +88,7 @@ class MatrixClient:
         self._client.add_event_callback(self._on_typing_notice, TypingNoticeEvent)
         self._client.add_event_callback(self._on_redaction, RedactionEvent)
         self._client.add_event_callback(self._on_unknown_event, UnknownEvent)
+        self._client.add_event_callback(self._on_invite_event, InviteMemberEvent)
 
     # ------------------------------------------------------------------
     # Auth
@@ -235,6 +240,15 @@ class MatrixClient:
                 break
         for cb in self._on_room_update:
             cb(room.room_id)
+
+    async def _on_invite_event(self, room: MatrixRoom, event: InviteMemberEvent) -> None:
+        """Track incoming invites (membership=invite targeting this user)."""
+        if event.membership != "invite" or event.state_key != self.user_id:
+            return
+        inviter = event.sender
+        self.invites[room.room_id] = inviter
+        for cb in self._on_invite:
+            cb(room.room_id, inviter)
 
     # ------------------------------------------------------------------
     # Messaging
@@ -400,6 +414,10 @@ class MatrixClient:
 
     def on_typing(self, cb: Callable[[str, list[str]], None]) -> None:
         self._on_typing.append(cb)
+
+    def on_invite(self, cb: Callable[[str, str], None]) -> None:
+        """Register callback for incoming invites: cb(room_id, inviter_user_id)."""
+        self._on_invite.append(cb)
 
     @property
     def nio_client(self) -> AsyncClient:

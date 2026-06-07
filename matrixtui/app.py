@@ -56,6 +56,13 @@ class TypingUpdated(TMessage):
         self.users = users
 
 
+class InviteReceived(TMessage):
+    def __init__(self, room_id: str, inviter: str) -> None:
+        super().__init__()
+        self.room_id = room_id
+        self.inviter = inviter
+
+
 class RoomListItem(ListItem):
     def __init__(self, summary: RoomSummary) -> None:
         super().__init__()
@@ -174,6 +181,7 @@ class MatrixApp(App):
         self._client.on_room_update(self._schedule_room_update)
         self._client.on_message(self._schedule_new_message)
         self._client.on_typing(self._schedule_typing_update)
+        self._client.on_invite(self._schedule_invite)
         self.run_worker(self._connect(), exclusive=True, name="matrix-sync")
 
     async def _connect(self) -> None:
@@ -204,6 +212,9 @@ class MatrixApp(App):
     def _schedule_typing_update(self, room_id: str, users: list[str]) -> None:
         self.post_message(TypingUpdated(room_id, users))
 
+    def _schedule_invite(self, room_id: str, inviter: str) -> None:
+        self.post_message(InviteReceived(room_id, inviter))
+
     # ------------------------------------------------------------------
     # Event handlers
     # ------------------------------------------------------------------
@@ -217,6 +228,12 @@ class MatrixApp(App):
             item.refresh_text()
         if self.current_room == event.room_id:
             self._append_message(event.msg)
+
+    def on_invite_received(self, event: InviteReceived) -> None:
+        inviter_short = event.inviter.split(":")[0].lstrip("@")
+        self.query_one("#status-bar", Static).update(
+            f"Invite from {inviter_short} to {event.room_id} — type /join {event.room_id} to accept"
+        )
 
     def on_typing_updated(self, event: TypingUpdated) -> None:
         if self.current_room != event.room_id:
