@@ -1329,3 +1329,105 @@ async def test_settopic_no_room_noop():
         await asyncio.ensure_future(app._handle_settopic("some topic"))
         await pilot.pause(0.1)
         client.set_room_topic.assert_not_called()
+
+
+# ------------------------------------------------------------------
+# /unban and /react slash commands
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_unban_success():
+    app, client = make_app()
+    client.unban_user = AsyncMock(return_value=True)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView, Static
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        import asyncio
+        await asyncio.ensure_future(app._handle_unban("@ex:m.org"))
+        await pilot.pause(0.1)
+        assert "Unbanned @ex:m.org" in str(app.query_one("#status-bar", Static).content)
+
+
+@pytest.mark.asyncio
+async def test_unban_failure():
+    app, client = make_app()
+    client.unban_user = AsyncMock(return_value=False)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView, Static
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        import asyncio
+        await asyncio.ensure_future(app._handle_unban("@ex:m.org"))
+        await pilot.pause(0.1)
+        assert "Failed to unban" in str(app.query_one("#status-bar", Static).content)
+
+
+@pytest.mark.asyncio
+async def test_unban_no_room_noop():
+    app, client = make_app()
+    client.unban_user = AsyncMock(return_value=True)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        import asyncio
+        await asyncio.ensure_future(app._handle_unban("@ex:m.org"))
+        await pilot.pause(0.1)
+        client.unban_user.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_react_sends_reaction_to_last_message():
+    app, client = make_app()
+    client.send_reaction = AsyncMock(return_value="$react1")
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView, Static
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        import asyncio
+        await asyncio.ensure_future(app._handle_react("👍"))
+        await pilot.pause(0.1)
+        # Should call send_reaction with the last message's event_id
+        client.send_reaction.assert_called_once()
+        args = client.send_reaction.call_args
+        assert args.args[2] == "👍"
+        assert "Reacted" in str(app.query_one("#status-bar", Static).content)
+
+
+@pytest.mark.asyncio
+async def test_react_no_messages_noop():
+    app, client = make_app()
+    client.send_reaction = AsyncMock(return_value="$r1")
+    # Clear messages for the room
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        client.messages["!r1:m.org"] = []
+        import asyncio
+        await asyncio.ensure_future(app._handle_react("👍"))
+        await pilot.pause(0.1)
+        client.send_reaction.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_react_no_room_noop():
+    app, client = make_app()
+    client.send_reaction = AsyncMock(return_value="$r1")
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        import asyncio
+        await asyncio.ensure_future(app._handle_react("👍"))
+        await pilot.pause(0.1)
+        client.send_reaction.assert_not_called()

@@ -1406,3 +1406,60 @@ async def test_set_room_topic_exception_returns_false():
     client = make_client()
     client._client.update_room_topic = AsyncMock(side_effect=Exception("network"))
     assert await client.set_room_topic("!r:m.org", "Hello") is False
+
+
+# ------------------------------------------------------------------
+# unban_user / send_reaction
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_unban_user_success():
+    from nio import RoomUnbanResponse
+    client = make_client()
+    client._client.room_unban = AsyncMock(return_value=RoomUnbanResponse())
+    assert await client.unban_user("!r:m.org", "@ex:m.org") is True
+    client._client.room_unban.assert_called_once_with("!r:m.org", "@ex:m.org")
+
+
+@pytest.mark.asyncio
+async def test_unban_user_failure_returns_false():
+    from nio import RoomBanError
+    client = make_client()
+    client._client.room_unban = AsyncMock(return_value=RoomBanError("forbidden"))
+    assert await client.unban_user("!r:m.org", "@ex:m.org") is False
+
+
+@pytest.mark.asyncio
+async def test_unban_user_exception_returns_false():
+    client = make_client()
+    client._client.room_unban = AsyncMock(side_effect=Exception("network"))
+    assert await client.unban_user("!r:m.org", "@ex:m.org") is False
+
+
+@pytest.mark.asyncio
+async def test_send_reaction_success():
+    from nio import RoomSendResponse
+    client = make_client()
+    client._client.room_send = AsyncMock(return_value=RoomSendResponse("$r1", "!r:m.org"))
+    result = await client.send_reaction("!r:m.org", "$ev1", "👍")
+    assert result == "$r1"
+    call_args = client._client.room_send.call_args
+    content = call_args.kwargs["content"]
+    assert content["m.relates_to"]["rel_type"] == "m.annotation"
+    assert content["m.relates_to"]["key"] == "👍"
+    assert content["m.relates_to"]["event_id"] == "$ev1"
+
+
+@pytest.mark.asyncio
+async def test_send_reaction_failure_returns_none():
+    from nio import RoomSendError
+    client = make_client()
+    client._client.room_send = AsyncMock(return_value=RoomSendError("forbidden"))
+    assert await client.send_reaction("!r:m.org", "$ev1", "👍") is None
+
+
+@pytest.mark.asyncio
+async def test_send_reaction_exception_returns_none():
+    client = make_client()
+    client._client.room_send = AsyncMock(side_effect=Exception("network"))
+    assert await client.send_reaction("!r:m.org", "$ev1", "👍") is None

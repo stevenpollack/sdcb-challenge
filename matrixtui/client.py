@@ -30,6 +30,7 @@ from nio import (
     RoomNameEvent,
     RoomPutStateResponse,
     RoomSendResponse,
+    RoomUnbanResponse,
     SyncResponse,
     TypingNoticeEvent,
     UnknownEvent,
@@ -476,6 +477,35 @@ class MatrixClient:
         except Exception as exc:
             logger.warning("ban_user error: %s", exc)
         return False
+
+    async def unban_user(self, room_id: str, user_id: str) -> bool:
+        """Unban a user from a room. Returns True on success."""
+        try:
+            resp = await self._client.room_unban(room_id, user_id)
+            return isinstance(resp, RoomUnbanResponse)
+        except Exception as exc:
+            logger.warning("unban_user error: %s", exc)
+        return False
+
+    async def send_reaction(self, room_id: str, event_id: str, key: str) -> str | None:
+        """Send a reaction (m.reaction) to a message. Returns event_id on success."""
+        try:
+            resp = await self._client.room_send(
+                room_id=room_id,
+                message_type="m.reaction",
+                content={
+                    "m.relates_to": {
+                        "rel_type": "m.annotation",
+                        "event_id": event_id,
+                        "key": key,
+                    }
+                },
+            )
+            if isinstance(resp, RoomSendResponse):
+                return resp.event_id
+        except Exception as exc:
+            logger.warning("send_reaction error: %s", exc)
+        return None
 
     async def create_room(self, name: str) -> str | None:
         """Create a new room with the given name. Returns room_id on success."""

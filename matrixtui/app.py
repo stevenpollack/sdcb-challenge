@@ -319,6 +319,12 @@ class MatrixApp(App):
         elif text.startswith("/ban "):
             target = text[5:].strip()
             await self._handle_ban(target)
+        elif text.startswith("/unban "):
+            target = text[7:].strip()
+            await self._handle_unban(target)
+        elif text.startswith("/react "):
+            key = text[7:].strip()
+            await self._handle_react(key)
         elif text.startswith("/create "):
             name = text[8:].strip()
             await self._handle_create(name)
@@ -397,6 +403,27 @@ class MatrixApp(App):
         ok = await self._client.ban_user(self.current_room, user_id)
         status.update(f"Banned {user_id}" if ok else f"Failed to ban {user_id}")
 
+    async def _handle_unban(self, user_id: str) -> None:
+        if not self.current_room or not user_id:
+            return
+        status = self.query_one("#status-bar", Static)
+        ok = await self._client.unban_user(self.current_room, user_id)
+        status.update(f"Unbanned {user_id}" if ok else f"Failed to unban {user_id}")
+
+    async def _handle_react(self, key: str) -> None:
+        if not self.current_room or not key:
+            return
+        msgs = self._client.messages.get(self.current_room, [])
+        if not msgs:
+            return
+        last_event_id = msgs[-1].event_id
+        status = self.query_one("#status-bar", Static)
+        event_id = await self._client.send_reaction(self.current_room, last_event_id, key)
+        if event_id:
+            status.update(f"Reacted with {key}")
+        else:
+            status.update(f"Failed to send reaction")
+
     async def _handle_create(self, name: str) -> None:
         if not name:
             return
@@ -473,6 +500,8 @@ class MatrixApp(App):
         log.write("  /invite <@user:srv>     Invite a user to the current room")
         log.write("  /kick <@user:srv>       Kick a user from the current room")
         log.write("  /ban <@user:srv>        Ban a user from the current room")
+        log.write("  /unban <@user:srv>      Unban a user from the current room")
+        log.write("  /react <emoji>          React to the last message in current room")
         log.write("  /create <name>          Create a new room with the given name")
         log.write("  /settopic <text>        Set the topic for the current room")
         log.write("  /clear                  Clear the message pane")

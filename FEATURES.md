@@ -41,3 +41,5 @@ more heavily than an accurate `partial` or `broken`.
 | Room member ban | working | /ban <@user:srv> bans a user from current room via Matrix API; success/failure shown in status bar |
 | Room creation | working | /create <name> creates a new private room; room_id shown in status bar on success |
 | Set room topic | working | /settopic <text> updates the room topic via state event; confirms in status bar and message pane |
+| Room member unban | working | /unban <@user:srv> lifts a ban via Matrix API; success/failure shown in status bar |
+| Message reactions | working | /react <emoji> sends m.reaction (m.annotation) targeting the last visible message |
