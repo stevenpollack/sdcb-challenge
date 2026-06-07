@@ -1463,3 +1463,44 @@ async def test_send_reaction_exception_returns_none():
     client = make_client()
     client._client.room_send = AsyncMock(side_effect=Exception("network"))
     assert await client.send_reaction("!r:m.org", "$ev1", "👍") is None
+
+
+# ------------------------------------------------------------------
+# get_user_power_level
+# ------------------------------------------------------------------
+
+def test_get_user_power_level_self():
+    from nio import PowerLevels
+    client = make_client()
+    room = MagicMock()
+    pl = PowerLevels(users={"@test:matrix.org": 100})
+    room.power_levels = pl
+    client._client.rooms = {"!r:m.org": room}
+    assert client.get_user_power_level("!r:m.org") == 100
+
+
+def test_get_user_power_level_other_user():
+    from nio import PowerLevels
+    client = make_client()
+    room = MagicMock()
+    pl = PowerLevels(users={"@mod:m.org": 50})
+    room.power_levels = pl
+    client._client.rooms = {"!r:m.org": room}
+    assert client.get_user_power_level("!r:m.org", "@mod:m.org") == 50
+
+
+def test_get_user_power_level_default_for_unknown_user():
+    from nio import PowerLevels
+    client = make_client()
+    room = MagicMock()
+    pl = PowerLevels()  # default users_default = 0
+    room.power_levels = pl
+    client._client.rooms = {"!r:m.org": room}
+    result = client.get_user_power_level("!r:m.org", "@nobody:m.org")
+    assert result == 0  # nio default
+
+
+def test_get_user_power_level_room_not_found():
+    client = make_client()
+    client._client.rooms = {}
+    assert client.get_user_power_level("!missing:m.org") is None

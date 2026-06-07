@@ -542,6 +542,17 @@ class MatrixClient:
         results.sort(key=lambda x: x[1].timestamp)
         return results
 
+    def get_user_power_level(self, room_id: str, user_id: str | None = None) -> int | None:
+        """Return the power level of user_id (defaults to self) in a room.
+
+        Returns None if the room is not found.
+        """
+        nio_room = self._client.rooms.get(room_id)
+        if nio_room is None:
+            return None
+        uid = user_id or self.user_id
+        return nio_room.power_levels.get_user_level(uid)
+
     def get_room_members(self, room_id: str) -> list[str]:
         """Return a list of user_ids currently in a room (from nio state)."""
         nio_room = self._client.rooms.get(room_id)

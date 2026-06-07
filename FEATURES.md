@@ -43,3 +43,4 @@ more heavily than an accurate `partial` or `broken`.
 | Set room topic | working | /settopic <text> updates the room topic via state event; confirms in status bar and message pane |
 | Room member unban | working | /unban <@user:srv> lifts a ban via Matrix API; success/failure shown in status bar |
 | Message reactions | working | /react <emoji> sends m.reaction (m.annotation) targeting the last visible message |
+| Power level display | working | /powerlevel [<@user>] shows numeric power level and role (Admin/Moderator) from room state |

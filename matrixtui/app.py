@@ -325,6 +325,9 @@ class MatrixApp(App):
         elif text.startswith("/react "):
             key = text[7:].strip()
             await self._handle_react(key)
+        elif text == "/powerlevel" or text.startswith("/powerlevel "):
+            target = text[12:].strip() if text.startswith("/powerlevel ") else None
+            self._handle_powerlevel(target)
         elif text.startswith("/create "):
             name = text[8:].strip()
             await self._handle_create(name)
@@ -409,6 +412,18 @@ class MatrixApp(App):
         status = self.query_one("#status-bar", Static)
         ok = await self._client.unban_user(self.current_room, user_id)
         status.update(f"Unbanned {user_id}" if ok else f"Failed to unban {user_id}")
+
+    def _handle_powerlevel(self, user_id: str | None = None) -> None:
+        if not self.current_room:
+            return
+        log = self.query_one("#messages", RichLog)
+        target = user_id or self._client.user_id
+        level = self._client.get_user_power_level(self.current_room, target)
+        if level is None:
+            log.write(f"[dim]Could not determine power level for {target}[/dim]")
+        else:
+            label = {100: "Admin", 50: "Moderator"}.get(level, f"level {level}")
+            log.write(f"[dim]Power level of[/dim] [bold]{target}[/bold]: {level} ({label})")
 
     async def _handle_react(self, key: str) -> None:
         if not self.current_room or not key:
@@ -502,6 +517,7 @@ class MatrixApp(App):
         log.write("  /ban <@user:srv>        Ban a user from the current room")
         log.write("  /unban <@user:srv>      Unban a user from the current room")
         log.write("  /react <emoji>          React to the last message in current room")
+        log.write("  /powerlevel [<@user>]   Show power level of self or a given user")
         log.write("  /create <name>          Create a new room with the given name")
         log.write("  /settopic <text>        Set the topic for the current room")
         log.write("  /clear                  Clear the message pane")

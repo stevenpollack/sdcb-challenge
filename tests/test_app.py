@@ -1431,3 +1431,59 @@ async def test_react_no_room_noop():
         await asyncio.ensure_future(app._handle_react("👍"))
         await pilot.pause(0.1)
         client.send_reaction.assert_not_called()
+
+
+# ------------------------------------------------------------------
+# /powerlevel command
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_powerlevel_shows_own_level():
+    app, client = make_app()
+    from nio import PowerLevels
+    pl = PowerLevels(users={"@test:matrix.org": 100})
+    app._client._client.rooms["!r1:m.org"].power_levels = pl
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView, RichLog
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        log = app.query_one("#messages", RichLog)
+        app._handle_powerlevel()
+        await pilot.pause(0.1)
+        assert any("100" in str(line) for line in log.lines)
+        assert any("Admin" in str(line) for line in log.lines)
+
+
+@pytest.mark.asyncio
+async def test_powerlevel_shows_other_user_level():
+    app, client = make_app()
+    from nio import PowerLevels
+    pl = PowerLevels(users={"@mod:m.org": 50})
+    app._client._client.rooms["!r1:m.org"].power_levels = pl
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView, RichLog
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        log = app.query_one("#messages", RichLog)
+        app._handle_powerlevel("@mod:m.org")
+        await pilot.pause(0.1)
+        assert any("50" in str(line) and "Moderator" in str(line) for line in log.lines)
+
+
+@pytest.mark.asyncio
+async def test_powerlevel_no_room_noop():
+    app, client = make_app()
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import RichLog
+        log = app.query_one("#messages", RichLog)
+        before = len(log.lines)
+        app._handle_powerlevel()
+        await pilot.pause(0.1)
+        assert len(log.lines) == before
