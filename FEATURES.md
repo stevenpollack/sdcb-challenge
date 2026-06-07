@@ -48,3 +48,4 @@ more heavily than an accurate `partial` or `broken`.
 | Direct message | working | /dm <@user:srv> creates a private is_direct=True room and invites the target user |
 | Presence control | working | /presence online|offline|unavailable sets global Matrix presence |
 | Rename room | working | /rename <name> updates current room's m.room.name state event |
+| Jump to next unread | working | Ctrl+N jumps to the next room with unread messages, skipping the current room |

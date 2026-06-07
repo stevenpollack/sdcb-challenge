@@ -150,6 +150,7 @@ class MatrixApp(App):
         Binding("ctrl+c", "quit", "Quit", show=True),
         Binding("ctrl+r", "reload_history", "History", show=True),
         Binding("ctrl+f", "focus_filter", "Filter rooms", show=True),
+        Binding("ctrl+n", "next_unread", "Next unread", show=True),
         Binding("escape", "focus_input", "Focus input", show=False),
     ]
 
@@ -554,6 +555,7 @@ class MatrixApp(App):
         log.write("")
         log.write("[bold]Keyboard:[/bold]")
         log.write("  Ctrl+F        Focus room filter")
+        log.write("  Ctrl+N        Jump to next room with unread messages")
         log.write("  Ctrl+R        Load older message history")
         log.write("  Ctrl+C        Quit")
         log.write("  Esc           Focus message input")
@@ -693,6 +695,27 @@ class MatrixApp(App):
     # ------------------------------------------------------------------
     # Actions
     # ------------------------------------------------------------------
+
+    def action_next_unread(self) -> None:
+        """Jump to the next room with unread messages."""
+        rooms = sorted(
+            self._client.rooms.values(),
+            key=lambda r: r.last_ts,
+            reverse=True,
+        )
+        unread_rooms = [r for r in rooms if r.unread_count > 0]
+        if not unread_rooms:
+            return
+        # Pick the first unread room that isn't already open; wrap around
+        candidates = [r for r in unread_rooms if r.room_id != self.current_room]
+        target = candidates[0] if candidates else unread_rooms[0]
+        item = self._room_items.get(target.room_id)
+        if item:
+            lv = self.query_one("#room-list", ListView)
+            lv.focus()
+            lv.scroll_to_widget(item)
+            self.current_room = target.room_id
+            self._load_room(target.room_id)
 
     async def action_reload_history(self) -> None:
         if not self.current_room:

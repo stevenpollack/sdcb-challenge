@@ -1660,3 +1660,52 @@ async def test_rename_no_room_noop():
         await asyncio.ensure_future(app._handle_rename("New Name"))
         await pilot.pause(0.1)
         client.rename_room.assert_not_called()
+
+
+# ------------------------------------------------------------------
+# Ctrl+N: jump to next unread room
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_next_unread_jumps_to_unread_room():
+    app, client = make_app()
+    # !r2 has unread=0, ensure !r2 has unread so we jump to it from no selection
+    client.rooms["!r2:m.org"].unread_count = 3
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        app.action_next_unread()
+        await pilot.pause(0.1)
+        # Should have loaded a room with unread messages
+        assert app.current_room is not None
+
+
+@pytest.mark.asyncio
+async def test_next_unread_skips_current_room():
+    app, client = make_app()
+    client.rooms["!r1:m.org"].unread_count = 2
+    client.rooms["!r2:m.org"].unread_count = 5
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        # Open r1 first
+        app.current_room = "!r1:m.org"
+        app._load_room("!r1:m.org")
+        await pilot.pause(0.1)
+        # Reset counts since _load_room zeros them
+        client.rooms["!r1:m.org"].unread_count = 2
+        client.rooms["!r2:m.org"].unread_count = 5
+        app.action_next_unread()
+        await pilot.pause(0.1)
+        # Should jump to r2, not stay on r1
+        assert app.current_room == "!r2:m.org"
+
+
+@pytest.mark.asyncio
+async def test_next_unread_noop_when_all_read():
+    app, client = make_app()
+    client.rooms["!r1:m.org"].unread_count = 0
+    client.rooms["!r2:m.org"].unread_count = 0
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        app.action_next_unread()
+        await pilot.pause(0.1)
+        assert app.current_room is None
