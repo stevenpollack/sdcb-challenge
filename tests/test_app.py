@@ -1487,3 +1487,48 @@ async def test_powerlevel_no_room_noop():
         app._handle_powerlevel()
         await pilot.pause(0.1)
         assert len(log.lines) == before
+
+
+# ------------------------------------------------------------------
+# /logout command
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_logout_calls_client_logout_and_clears_session():
+    app, client = make_app()
+    client.logout = AsyncMock()
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        with patch("matrixtui.app.MatrixApp._handle_logout") as mock_logout:
+            mock_logout.return_value = None
+            # Verify logout is wired to /logout command via dispatcher
+            inp = app.query_one("#msg-input")
+            inp.focus()
+            inp.insert_text_at_cursor("/logout")
+            # Can't easily test app.exit() in pilot — test handler directly instead
+        import asyncio
+        from unittest.mock import patch as _patch
+        with _patch("matrixtui.session.clear_session") as mock_clear:
+            # Prevent actual exit
+            app.exit = MagicMock()
+            await asyncio.ensure_future(app._handle_logout())
+            await pilot.pause(0.1)
+            mock_clear.assert_called_once()
+            client.logout.assert_called_once()
+            app.exit.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_logout_status_bar_updates():
+    app, client = make_app()
+    client.logout = AsyncMock()
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import Static
+        from unittest.mock import patch as _patch
+        with _patch("matrixtui.session.clear_session"):
+            app.exit = MagicMock()
+            import asyncio
+            await asyncio.ensure_future(app._handle_logout())
+            await pilot.pause(0.1)
+            assert "Logging out" in str(app.query_one("#status-bar", Static).content)

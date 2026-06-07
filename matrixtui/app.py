@@ -133,10 +133,10 @@ class MatrixApp(App):
     #input-bar {
         height: 3;
         border-top: solid $primary;
-        padding: 1 0 0 0;
     }
     #msg-input {
         width: 1fr;
+        border: none;
     }
     #status-bar {
         height: 1;
@@ -336,6 +336,8 @@ class MatrixApp(App):
             await self._handle_settopic(topic)
         elif text == "/create":
             self.query_one("#status-bar", Static).update("Usage: /create <room name>")
+        elif text == "/logout":
+            await self._handle_logout()
         elif text == "/clear":
             self._handle_clear()
         elif self.current_room:
@@ -412,6 +414,17 @@ class MatrixApp(App):
         status = self.query_one("#status-bar", Static)
         ok = await self._client.unban_user(self.current_room, user_id)
         status.update(f"Unbanned {user_id}" if ok else f"Failed to unban {user_id}")
+
+    async def _handle_logout(self) -> None:
+        status = self.query_one("#status-bar", Static)
+        status.update("Logging out…")
+        try:
+            from .session import clear_session
+            clear_session()
+        except Exception:
+            pass
+        await self._client.logout()
+        self.exit()
 
     def _handle_powerlevel(self, user_id: str | None = None) -> None:
         if not self.current_room:
@@ -518,6 +531,7 @@ class MatrixApp(App):
         log.write("  /unban <@user:srv>      Unban a user from the current room")
         log.write("  /react <emoji>          React to the last message in current room")
         log.write("  /powerlevel [<@user>]   Show power level of self or a given user")
+        log.write("  /logout                 Log out and clear saved session")
         log.write("  /create <name>          Create a new room with the given name")
         log.write("  /settopic <text>        Set the topic for the current room")
         log.write("  /clear                  Clear the message pane")

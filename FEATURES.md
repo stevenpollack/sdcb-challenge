@@ -44,3 +44,4 @@ more heavily than an accurate `partial` or `broken`.
 | Room member unban | working | /unban <@user:srv> lifts a ban via Matrix API; success/failure shown in status bar |
 | Message reactions | working | /react <emoji> sends m.reaction (m.annotation) targeting the last visible message |
 | Power level display | working | /powerlevel [<@user>] shows numeric power level and role (Admin/Moderator) from room state |
+| Logout | working | /logout invalidates server session, clears ~/.config/matrixtui/session.json, and exits |
