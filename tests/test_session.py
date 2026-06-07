@@ -1,10 +1,10 @@
 """Tests for session persistence (save/load/clear)."""
 import json
-import pytest
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
-from matrixtui.session import save_session, load_session, clear_session
+import pytest
+
+from matrixtui.session import clear_session, load_session, save_session
 
 
 @pytest.fixture
@@ -70,6 +70,7 @@ def test_clear_noop_when_no_file(tmp_session):
 
 def test_clear_swallows_exceptions(tmp_session, monkeypatch):
     import matrixtui.session as mod
-    monkeypatch.setattr(mod, "_SESSION_FILE", MagicMock(unlink=MagicMock(side_effect=PermissionError("denied"))))
+    mock_file = MagicMock(unlink=MagicMock(side_effect=PermissionError("denied")))
+    monkeypatch.setattr(mod, "_SESSION_FILE", mock_file)
     # Should not raise
     clear_session()

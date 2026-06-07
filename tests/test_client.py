@@ -1,6 +1,7 @@
 """Unit tests for MatrixClient logic (no network)."""
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, call
 
 from matrixtui.client import MatrixClient, Message, RoomSummary
 
@@ -301,7 +302,7 @@ async def test_load_history_returns_empty_on_error():
 @pytest.mark.asyncio
 async def test_load_history_prepends_messages():
     client = make_client()
-    from nio import RoomMessageText, RoomMessagesResponse
+    from nio import RoomMessagesResponse, RoomMessageText
     client.rooms["!r:m.org"] = RoomSummary("!r:m.org", "Room")
     nio_room = MagicMock()
     nio_room.prev_batch = "t123"
@@ -328,7 +329,7 @@ async def test_load_history_prepends_messages():
 @pytest.mark.asyncio
 async def test_load_history_deduplicates():
     client = make_client()
-    from nio import RoomMessageText, RoomMessagesResponse
+    from nio import RoomMessagesResponse, RoomMessageText
     client.rooms["!r:m.org"] = RoomSummary("!r:m.org", "Room")
     nio_room = MagicMock()
     nio_room.prev_batch = "t123"

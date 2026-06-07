@@ -306,7 +306,9 @@ class MatrixApp(App):
             room_name = self._client.rooms.get(room_id, None)
             rname = room_name.display_name if room_name else room_id
             from datetime import datetime, timezone
-            ts = datetime.fromtimestamp(msg.timestamp / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M")
+            ts = datetime.fromtimestamp(
+                msg.timestamp / 1000, tz=timezone.utc
+            ).strftime("%Y-%m-%d %H:%M")
             sender_short = msg.sender.split(":")[0].lstrip("@")
             log.write(f"[dim]{rname}[/dim] [{ts}] [bold]{sender_short}[/bold]: {msg.body}")
 

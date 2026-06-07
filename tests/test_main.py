@@ -1,7 +1,7 @@
 """Tests for __main__ entry point."""
-import sys
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 
 def test_main_exits_on_missing_credentials(capsys):
