@@ -310,6 +310,12 @@ class MatrixApp(App):
         elif text.startswith("/whois "):
             target = text[7:].strip()
             await self._handle_whois(target)
+        elif text.startswith("/invite "):
+            target = text[8:].strip()
+            await self._handle_invite(target)
+        elif text.startswith("/kick "):
+            target = text[6:].strip()
+            await self._handle_kick(target)
         elif text == "/clear":
             self._handle_clear()
         elif self.current_room:
@@ -358,6 +364,20 @@ class MatrixApp(App):
         log.write(f"[bold]{user_id}[/bold]")
         log.write(f"  Display name: {display}")
         log.write(f"  Avatar:       {avatar}")
+
+    async def _handle_invite(self, user_id: str) -> None:
+        if not self.current_room or not user_id:
+            return
+        status = self.query_one("#status-bar", Static)
+        ok = await self._client.invite_user(self.current_room, user_id)
+        status.update(f"Invited {user_id}" if ok else f"Failed to invite {user_id}")
+
+    async def _handle_kick(self, user_id: str) -> None:
+        if not self.current_room or not user_id:
+            return
+        status = self.query_one("#status-bar", Static)
+        ok = await self._client.kick_user(self.current_room, user_id)
+        status.update(f"Kicked {user_id}" if ok else f"Failed to kick {user_id}")
 
     def _handle_clear(self) -> None:
         self.query_one("#messages", RichLog).clear()
@@ -409,6 +429,8 @@ class MatrixApp(App):
         log.write("  /nick <name>            Set your global display name")
         log.write("  /me <action>            Send an emote (e.g. /me waves)")
         log.write("  /whois <@user:srv>      Show a user's display name and avatar")
+        log.write("  /invite <@user:srv>     Invite a user to the current room")
+        log.write("  /kick <@user:srv>       Kick a user from the current room")
         log.write("  /clear                  Clear the message pane")
 
     def _handle_members(self) -> None:

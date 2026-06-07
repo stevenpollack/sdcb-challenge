@@ -1253,3 +1253,70 @@ async def test_on_room_name_fires_room_update_callback():
     await client._on_room_name(room, event)
 
     ru_cb.assert_called_once_with("!r:m.org")
+
+
+# ------------------------------------------------------------------
+# invite_user / kick_user
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_invite_user_success():
+    from nio import RoomInviteResponse
+    client = make_client()
+    client._client.room_invite = AsyncMock(return_value=RoomInviteResponse())
+    result = await client.invite_user("!r:m.org", "@bob:m.org")
+    assert result is True
+    client._client.room_invite.assert_called_once_with("!r:m.org", "@bob:m.org")
+
+
+@pytest.mark.asyncio
+async def test_invite_user_failure_returns_false():
+    from nio import RoomInviteError
+    client = make_client()
+    client._client.room_invite = AsyncMock(return_value=RoomInviteError("forbidden"))
+    result = await client.invite_user("!r:m.org", "@bob:m.org")
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_invite_user_exception_returns_false():
+    client = make_client()
+    client._client.room_invite = AsyncMock(side_effect=Exception("network error"))
+    result = await client.invite_user("!r:m.org", "@bob:m.org")
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_kick_user_success():
+    from nio import RoomKickResponse
+    client = make_client()
+    client._client.room_kick = AsyncMock(return_value=RoomKickResponse())
+    result = await client.kick_user("!r:m.org", "@bob:m.org", "disruptive")
+    assert result is True
+    client._client.room_kick.assert_called_once_with("!r:m.org", "@bob:m.org", "disruptive")
+
+
+@pytest.mark.asyncio
+async def test_kick_user_empty_reason_passes_none():
+    from nio import RoomKickResponse
+    client = make_client()
+    client._client.room_kick = AsyncMock(return_value=RoomKickResponse())
+    await client.kick_user("!r:m.org", "@bob:m.org", "")
+    client._client.room_kick.assert_called_once_with("!r:m.org", "@bob:m.org", None)
+
+
+@pytest.mark.asyncio
+async def test_kick_user_failure_returns_false():
+    from nio import RoomKickError
+    client = make_client()
+    client._client.room_kick = AsyncMock(return_value=RoomKickError("forbidden"))
+    result = await client.kick_user("!r:m.org", "@bob:m.org")
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_kick_user_exception_returns_false():
+    client = make_client()
+    client._client.room_kick = AsyncMock(side_effect=Exception("network error"))
+    result = await client.kick_user("!r:m.org", "@bob:m.org")
+    assert result is False

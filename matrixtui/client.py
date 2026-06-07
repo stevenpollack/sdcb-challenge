@@ -15,6 +15,8 @@ from nio import (
     MatrixRoom,
     MessageDirection,
     RedactionEvent,
+    RoomInviteResponse,
+    RoomKickResponse,
     RoomMessage,
     RoomMessageAudio,
     RoomMessageEmote,
@@ -444,6 +446,24 @@ class MatrixClient:
         except Exception as exc:
             logger.warning("set_display_name error: %s", exc)
             return False
+
+    async def invite_user(self, room_id: str, user_id: str) -> bool:
+        """Invite a user to a room. Returns True on success."""
+        try:
+            resp = await self._client.room_invite(room_id, user_id)
+            return isinstance(resp, RoomInviteResponse)
+        except Exception as exc:
+            logger.warning("invite_user error: %s", exc)
+        return False
+
+    async def kick_user(self, room_id: str, user_id: str, reason: str = "") -> bool:
+        """Kick a user from a room. Returns True on success."""
+        try:
+            resp = await self._client.room_kick(room_id, user_id, reason or None)
+            return isinstance(resp, RoomKickResponse)
+        except Exception as exc:
+            logger.warning("kick_user error: %s", exc)
+        return False
 
     def search_messages(self, query: str, room_id: str | None = None) -> list[tuple[str, Message]]:
         """Search loaded messages for a query string (case-insensitive).

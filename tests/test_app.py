@@ -1047,3 +1047,122 @@ async def test_nick_empty_via_handler():
         await asyncio.ensure_future(app._handle_nick(""))
         await pilot.pause(0.1)
         client.set_display_name.assert_not_called()
+
+
+# ------------------------------------------------------------------
+# /invite and /kick slash commands
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_invite_updates_status_on_success():
+    app, client = make_app()
+    client.invite_user = AsyncMock(return_value=True)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        import asyncio
+        await asyncio.ensure_future(app._handle_invite("@bob:m.org"))
+        await pilot.pause(0.1)
+        from textual.widgets import Static
+        status = app.query_one("#status-bar", Static)
+        assert "Invited @bob:m.org" in str(status.content)
+
+
+@pytest.mark.asyncio
+async def test_invite_updates_status_on_failure():
+    app, client = make_app()
+    client.invite_user = AsyncMock(return_value=False)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView, Static
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        import asyncio
+        await asyncio.ensure_future(app._handle_invite("@bob:m.org"))
+        await pilot.pause(0.1)
+        status = app.query_one("#status-bar", Static)
+        assert "Failed to invite" in str(status.content)
+
+
+@pytest.mark.asyncio
+async def test_invite_no_room_noop():
+    app, client = make_app()
+    client.invite_user = AsyncMock(return_value=True)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        import asyncio
+        await asyncio.ensure_future(app._handle_invite("@bob:m.org"))
+        await pilot.pause(0.1)
+        client.invite_user.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_invite_empty_user_noop():
+    app, client = make_app()
+    client.invite_user = AsyncMock(return_value=True)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        import asyncio
+        await asyncio.ensure_future(app._handle_invite(""))
+        await pilot.pause(0.1)
+        client.invite_user.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_kick_updates_status_on_success():
+    app, client = make_app()
+    client.kick_user = AsyncMock(return_value=True)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        import asyncio
+        await asyncio.ensure_future(app._handle_kick("@alice:m.org"))
+        await pilot.pause(0.1)
+        from textual.widgets import Static
+        status = app.query_one("#status-bar", Static)
+        assert "Kicked @alice:m.org" in str(status.content)
+
+
+@pytest.mark.asyncio
+async def test_kick_updates_status_on_failure():
+    app, client = make_app()
+    client.kick_user = AsyncMock(return_value=False)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import ListView, Static
+        lv = app.query_one("#room-list", ListView)
+        lv.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause(0.1)
+        import asyncio
+        await asyncio.ensure_future(app._handle_kick("@alice:m.org"))
+        await pilot.pause(0.1)
+        status = app.query_one("#status-bar", Static)
+        assert "Failed to kick" in str(status.content)
+
+
+@pytest.mark.asyncio
+async def test_kick_no_room_noop():
+    app, client = make_app()
+    client.kick_user = AsyncMock(return_value=True)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        import asyncio
+        await asyncio.ensure_future(app._handle_kick("@alice:m.org"))
+        await pilot.pause(0.1)
+        client.kick_user.assert_not_called()

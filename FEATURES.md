@@ -36,3 +36,5 @@ more heavily than an accurate `partial` or `broken`.
 | User profile lookup | working | /whois <@user:srv> fetches and displays display name and avatar URL via profile API |
 | Clear message pane | working | /clear empties the message pane without affecting stored messages |
 | Total unread in status bar | working | Status bar shows "[N unread]" count across all rooms; updates live on sync |
+| Room member invite | working | /invite <@user:srv> sends room invite via Matrix API; success/failure shown in status bar |
+| Room member kick | working | /kick <@user:srv> kicks a user from current room via Matrix API; success/failure shown in status bar |
