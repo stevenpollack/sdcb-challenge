@@ -1,6 +1,8 @@
 """Unit tests for MatrixClient logic (no network)."""
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
 from matrixtui.client import MatrixClient, Message, RoomSummary
 
 
@@ -85,19 +87,9 @@ async def test_send_message_returns_event_id():
 @pytest.mark.asyncio
 async def test_send_message_failure_returns_none():
     client = make_client()
-    from nio import RoomSendError
     with patch.object(client._client, "room_send", new_callable=AsyncMock) as mock_send:
-        mock_send.return_value = MagicMock()  # not RoomSendResponse
-        # Patch isinstance to return False for RoomSendResponse
-        import matrixtui.client as mod
-        original = mod.RoomSendResponse
-        try:
-            # Make the response not match RoomSendResponse
-            mock_send.return_value = object()
-            result = await client.send_message("!room:matrix.org", "hello")
-        finally:
-            pass
-    # object() is not RoomSendResponse, so result should be None
+        mock_send.return_value = object()  # not RoomSendResponse
+        result = await client.send_message("!room:matrix.org", "hello")
     assert result is None
 
 

@@ -11,14 +11,12 @@ from nio import (
     AsyncClientConfig,
     LoginResponse,
     MatrixRoom,
-    RoomMessageText,
-    SyncResponse,
-    RoomMemberEvent,
-    RoomNameEvent,
-    RoomMessage,
-    RoomSendResponse,
-    RoomMessagesResponse,
     MessageDirection,
+    RoomMessagesResponse,
+    RoomMessageText,
+    RoomNameEvent,
+    RoomSendResponse,
+    SyncResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -78,7 +76,11 @@ class MatrixClient:
                 await self._sync_task
             except asyncio.CancelledError:
                 pass
-        await self._client.logout()
+        if self._client.access_token:
+            try:
+                await self._client.logout()
+            except Exception:
+                pass
         await self._client.close()
 
     # ------------------------------------------------------------------

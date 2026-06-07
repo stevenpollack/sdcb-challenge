@@ -1,11 +1,10 @@
 """Entry point."""
-import asyncio
 import logging
 import sys
 
-from .config import Config
-from .client import MatrixClient
 from .app import MatrixApp
+from .client import MatrixClient
+from .config import Config
 
 
 def main() -> None:

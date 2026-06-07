@@ -17,7 +17,7 @@ test:
 	$(PYTEST) tests/ -v --tb=short
 
 coverage:
-	$(PYTEST) tests/ --cov=matrixtui --cov-report=json:coverage-summary.json --tb=short
+	$(PYTEST) tests/ -m "not integration" --cov=matrixtui --cov-report=json:coverage-summary.json --tb=short
 	$(PYTHON) -c "\
 import json; \
 raw = json.load(open('coverage-summary.json')); \
@@ -28,7 +28,7 @@ json.dump(summary, open('coverage-summary.json', 'w')); \
 print(f'Coverage: {pct:.1f}%')"
 
 test-report:
-	$(PYTEST) tests/ --junitxml=junit.xml --tb=short
+	$(PYTEST) tests/ -m "not integration" --junitxml=junit.xml --tb=short
 
 lint:
 	$(RUFF) check matrixtui/ tests/ || true

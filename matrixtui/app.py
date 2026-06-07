@@ -1,13 +1,13 @@
 """Textual TUI application for Matrix."""
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import datetime, timezone
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
+from textual.message import Message as TMessage
 from textual.reactive import reactive
 from textual.widgets import (
     Footer,
@@ -19,7 +19,6 @@ from textual.widgets import (
     RichLog,
     Static,
 )
-from textual.message import Message as TMessage
 
 from .client import MatrixClient, Message, RoomSummary
 from .config import Config
