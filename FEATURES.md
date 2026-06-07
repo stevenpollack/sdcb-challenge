@@ -33,3 +33,6 @@ more heavily than an accurate `partial` or `broken`.
 | Display name change | working | /nick <name> sets the user's global Matrix display name via profile API |
 | Emote sending | working | /me <action> sends m.emote type; renders as "* username action" in-line |
 | Date separators | working | Day-boundary separators (─── 2024-01-15 ───) shown between messages from different days |
+| User profile lookup | working | /whois <@user:srv> fetches and displays display name and avatar URL via profile API |
+| Clear message pane | working | /clear empties the message pane without affecting stored messages |
+| Total unread in status bar | working | Status bar shows "[N unread]" count across all rooms; updates live on sync |

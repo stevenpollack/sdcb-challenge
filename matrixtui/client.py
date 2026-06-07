@@ -406,6 +406,28 @@ class MatrixClient:
             return non_self[0]
         return room.room_id
 
+    async def get_user_profile(self, user_id: str) -> dict | None:
+        """Fetch a user's global profile (display_name, avatar_url).
+
+        Returns a dict with 'display_name' and 'avatar_url' keys (either may
+        be None/absent), or None if the request fails.
+        """
+        try:
+            from nio import ProfileGetResponse
+            resp = await self._client.get_profile(user_id)
+            if isinstance(resp, ProfileGetResponse):
+                return {
+                    "display_name": resp.displayname,
+                    "avatar_url": resp.avatar_url,
+                }
+        except Exception as exc:
+            logger.warning("get_user_profile error: %s", exc)
+        return None
+
+    def total_unread(self) -> int:
+        """Return the sum of unread_count across all known rooms."""
+        return sum(r.unread_count for r in self.rooms.values())
+
     def get_room_topic(self, room_id: str) -> str | None:
         """Return the current topic for a room, or None if not set."""
         nio_room = self._client.rooms.get(room_id)

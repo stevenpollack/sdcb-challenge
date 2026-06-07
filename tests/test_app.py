@@ -935,6 +935,62 @@ async def test_unread_badge_clears_on_room_select():
 # ------------------------------------------------------------------
 
 @pytest.mark.asyncio
+async def test_whois_command_shows_profile():
+    app, client = make_app()
+    client.get_user_profile = AsyncMock(return_value={
+        "display_name": "Alice Smith",
+        "avatar_url": "mxc://matrix.org/xyz",
+    })
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        await _send_command(pilot, app, "/whois @alice:m.org")
+        await pilot.pause(0.2)
+        from textual.widgets import RichLog
+        assert app.query_one("#messages", RichLog).lines
+
+
+@pytest.mark.asyncio
+async def test_whois_command_no_profile():
+    app, client = make_app()
+    client.get_user_profile = AsyncMock(return_value=None)
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        await _send_command(pilot, app, "/whois @unknown:m.org")
+        await pilot.pause(0.2)
+        from textual.widgets import RichLog
+        assert app.query_one("#messages", RichLog).lines  # shows error message
+
+
+@pytest.mark.asyncio
+async def test_clear_command():
+    app, client = make_app()
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        from textual.widgets import RichLog
+        log = app.query_one("#messages", RichLog)
+        assert len(log.lines) > 0  # welcome message present
+        await _send_command(pilot, app, "/clear")
+        await pilot.pause(0.1)
+        assert len(log.lines) == 0
+
+
+@pytest.mark.asyncio
+async def test_status_bar_shows_unread_count():
+    app, client = make_app()
+    client.rooms["!r1:m.org"].unread_count = 5
+    client.rooms["!r2:m.org"].unread_count = 3
+    async with app.run_test(size=(120, 35)) as pilot:
+        await pilot.pause(0.3)
+        # Trigger a room update to fire _update_status
+        from matrixtui.app import RoomUpdated
+        app.post_message(RoomUpdated("!r1:m.org"))
+        await pilot.pause(0.2)
+        from textual.widgets import Static
+        status = _static_text(app.query_one("#status-bar", Static))
+        assert "unread" in status
+
+
+@pytest.mark.asyncio
 async def test_date_separator_shown_between_days():
     app, client = make_app()
     # Add messages on two different days

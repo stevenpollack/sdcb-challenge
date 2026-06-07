@@ -194,7 +194,7 @@ class MatrixApp(App):
         log.write("[bold]Quick reference:[/bold]")
         log.write("  [dim]/help[/dim]          Show all commands and keybindings")
         log.write("  [dim]/join #room:srv[/dim] Join a room")
-        log.write("  [dim]/search <query>[/dim] Search messages")
+        log.write("  [dim]/search <query>[/dim] Search messages  [dim]/clear[/dim] Clear pane")
         log.write("  [dim]Ctrl+F[/dim]          Filter rooms  [dim]Ctrl+R[/dim] Load history")
         log.write("")
 
@@ -205,13 +205,18 @@ class MatrixApp(App):
             await self._client.login(cfg.password)
             self.query_one("#status-bar", Static).update("Syncing…")
             await self._client.start_sync()
-            self.query_one("#status-bar", Static).update(
-                f"Connected as {self._client.user_id}"
-            )
             self._rebuild_room_list()
+            self._update_status()
         except Exception as exc:
             self.query_one("#status-bar", Static).update(f"Error: {exc}")
             logger.exception("Connection failed")
+
+    def _update_status(self) -> None:
+        unread = self._client.total_unread()
+        badge = f"  [{unread} unread]" if unread else ""
+        self.query_one("#status-bar", Static).update(
+            f"Connected as {self._client.user_id}{badge}"
+        )
 
     # ------------------------------------------------------------------
     # Scheduled message handlers (bridge sync thread → Textual event loop)
@@ -235,6 +240,8 @@ class MatrixApp(App):
 
     def on_room_updated(self, event: RoomUpdated) -> None:
         self._rebuild_room_list()
+        if self._client.user_id:
+            self._update_status()
 
     def on_new_message(self, event: NewMessage) -> None:
         item = self._room_items.get(event.room_id)
@@ -300,6 +307,11 @@ class MatrixApp(App):
         elif text.startswith("/me "):
             emote = text[4:].strip()
             await self._handle_me(emote)
+        elif text.startswith("/whois "):
+            target = text[7:].strip()
+            await self._handle_whois(target)
+        elif text == "/clear":
+            self._handle_clear()
         elif self.current_room:
             await self._client.send_message(self.current_room, text)
 
@@ -332,6 +344,23 @@ class MatrixApp(App):
             ).strftime("%Y-%m-%d %H:%M")
             sender_short = msg.sender.split(":")[0].lstrip("@")
             log.write(f"[dim]{rname}[/dim] [{ts}] [bold]{sender_short}[/bold]: {msg.body}")
+
+    async def _handle_whois(self, user_id: str) -> None:
+        if not user_id:
+            return
+        log = self.query_one("#messages", RichLog)
+        profile = await self._client.get_user_profile(user_id)
+        if profile is None:
+            log.write(f"[dim]Could not fetch profile for {user_id}[/dim]")
+            return
+        display = profile.get("display_name") or "(no display name)"
+        avatar = profile.get("avatar_url") or "(no avatar)"
+        log.write(f"[bold]{user_id}[/bold]")
+        log.write(f"  Display name: {display}")
+        log.write(f"  Avatar:       {avatar}")
+
+    def _handle_clear(self) -> None:
+        self.query_one("#messages", RichLog).clear()
 
     async def _handle_me(self, emote: str) -> None:
         if not self.current_room or not emote:
@@ -379,6 +408,8 @@ class MatrixApp(App):
         log.write("  /topic                  Show the current room topic")
         log.write("  /nick <name>            Set your global display name")
         log.write("  /me <action>            Send an emote (e.g. /me waves)")
+        log.write("  /whois <@user:srv>      Show a user's display name and avatar")
+        log.write("  /clear                  Clear the message pane")
 
     def _handle_members(self) -> None:
         if not self.current_room:

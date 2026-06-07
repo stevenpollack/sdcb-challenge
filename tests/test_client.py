@@ -970,6 +970,62 @@ async def test_on_invite_event_ignores_non_invite():
 
 
 # ------------------------------------------------------------------
+# get_user_profile
+# ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_get_user_profile_returns_dict():
+    client = make_client()
+    from nio import ProfileGetResponse
+    mock_resp = MagicMock(spec=ProfileGetResponse)
+    mock_resp.displayname = "Alice"
+    mock_resp.avatar_url = "mxc://matrix.org/abc"
+    with patch.object(client._client, "get_profile", new_callable=AsyncMock) as mock_gp:
+        mock_gp.return_value = mock_resp
+        result = await client.get_user_profile("@alice:m.org")
+    assert result == {"display_name": "Alice", "avatar_url": "mxc://matrix.org/abc"}
+
+
+@pytest.mark.asyncio
+async def test_get_user_profile_returns_none_on_failure():
+    client = make_client()
+    with patch.object(client._client, "get_profile", new_callable=AsyncMock) as mock_gp:
+        mock_gp.return_value = object()  # not ProfileGetResponse
+        result = await client.get_user_profile("@alice:m.org")
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_user_profile_swallows_exception():
+    client = make_client()
+    with patch.object(
+        client._client, "get_profile", new_callable=AsyncMock,
+        side_effect=Exception("net error")
+    ):
+        result = await client.get_user_profile("@alice:m.org")
+    assert result is None
+
+
+# ------------------------------------------------------------------
+# total_unread
+# ------------------------------------------------------------------
+
+def test_total_unread_sums_rooms():
+    client = make_client()
+    client.rooms = {
+        "!r1:m.org": RoomSummary("!r1:m.org", "A", unread_count=3),
+        "!r2:m.org": RoomSummary("!r2:m.org", "B", unread_count=7),
+        "!r3:m.org": RoomSummary("!r3:m.org", "C", unread_count=0),
+    }
+    assert client.total_unread() == 10
+
+
+def test_total_unread_empty():
+    client = make_client()
+    assert client.total_unread() == 0
+
+
+# ------------------------------------------------------------------
 # get_room_topic
 # ------------------------------------------------------------------
 
