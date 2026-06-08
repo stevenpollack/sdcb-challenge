@@ -112,10 +112,43 @@ Type any of these in the message input and press Enter:
 | `/stats` | Show local cache statistics |
 | `/logout` | Log out and clear the saved session |
 
-## Testing
+## Running in the browser
+
+matrixtui can be served as a web application using
+[textual-serve](https://github.com/Textualize/textual-serve).
+
+### Demo (mock data, no credentials)
+
+Spin up the pre-seeded mock app — all three rooms and messages are hardcoded,
+no Matrix homeserver required:
 
 ```bash
-# Unit tests only (no credentials needed)
+make serve-webapp
+# then open http://localhost:8765 in your browser
+```
+
+### Real app in the browser
+
+Serve your actual matrixtui session in a browser tab (credentials must be in
+`.env.local`):
+
+```bash
+.venv/bin/python -c "
+from textual_serve.server import Server
+Server('.venv/bin/python -m matrixtui', port=8765).serve()
+"
+# then open http://localhost:8765
+```
+
+> **Note:** textual-serve creates a fresh app subprocess per browser connection,
+> so opening the URL a second time starts a new session.
+
+## Testing
+
+### Unit / TUI tests
+
+```bash
+# All unit tests (no credentials needed)
 make test
 
 # Tests with coverage report
@@ -128,8 +161,49 @@ make test-report     # writes junit.xml
 make lint
 ```
 
-Integration tests (marked `@pytest.mark.integration`) require `.env.local` with valid credentials.
-They are included in `make test` but will be skipped automatically if credentials are absent.
+Integration tests (marked `@pytest.mark.integration`) require `.env.local` with
+valid credentials and are skipped automatically when credentials are absent.
+
+### Playwright / browser e2e tests
+
+The `tests/e2e/` suite drives the mock webapp through a real Chromium browser,
+verifying that all user journeys work identically whether running in the
+terminal or the browser.
+
+```bash
+# Run the full e2e suite (headed browser — you will see windows open)
+make test-e2e
+
+# Run headless (required in CI or when no display is available)
+PLAYWRIGHT_HEADLESS=1 make test-e2e
+
+# Run a single journey for quick feedback
+.venv/bin/pytest tests/e2e/test_journeys.py::test_room_list_shows_all_seeded_rooms -v
+```
+
+**Interactive / debug mode**
+
+Because `PLAYWRIGHT_HEADLESS` defaults to `0`, the browser opens visibly.
+To step through a test with Playwright's inspector:
+
+```bash
+PWDEBUG=1 .venv/bin/pytest tests/e2e/test_journeys.py::test_help_command_shows_command_reference -v
+```
+
+`PWDEBUG=1` pauses execution before each action and opens the Playwright
+Inspector so you can step through interactions, inspect selectors, and see
+the live terminal state.
+
+**How it works**
+
+1. A session-level fixture starts `textual-serve` (port 8765) serving
+   `tests/e2e/mock_app.py` — a fully offline MatrixApp with pre-seeded rooms
+   and all network calls stubbed.
+2. Each test launches a Chromium instance, navigates to `http://localhost:8765`,
+   and waits for the terminal to render.
+3. A one-line JavaScript init script disables WebGL, which causes xterm.js to
+   fall back to its DOM renderer and exposes each terminal row as a real `<div>`
+   — making text assertions possible without screenshots.
 
 ## Project layout
 
@@ -146,4 +220,8 @@ tests/            # pytest suite
   test_app.py     # Textual pilot tests for MatrixApp UI
   test_config.py  # config loading tests
   test_integration.py  # live homeserver E2E tests
+  e2e/            # Playwright browser tests (textual-serve)
+    mock_app.py   # offline MatrixApp with pre-seeded mock data
+    conftest.py   # fixtures: server, browser, page, helper functions
+    test_journeys.py  # 25 user-journey tests
 ```

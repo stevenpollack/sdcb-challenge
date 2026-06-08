@@ -4,17 +4,24 @@ PIP := $(VENV)/bin/pip
 PYTEST := $(VENV)/bin/pytest
 RUFF := $(VENV)/bin/ruff
 
-.PHONY: setup run test coverage test-report lint
+.PHONY: setup run serve-webapp test test-e2e coverage test-report lint
 
 setup:
 	python3 -m venv $(VENV)
-	$(PIP) install -e . pytest pytest-asyncio pytest-cov ruff
+	$(PIP) install -e ".[e2e]" pytest pytest-asyncio pytest-cov ruff
+	$(VENV)/bin/playwright install chromium
 
 run:
 	$(PYTHON) -m matrixtui
 
+serve-webapp:
+	$(PYTHON) -c "from textual_serve.server import Server; Server('$(PYTHON) tests/e2e/mock_app.py', port=8765).serve()"
+
 test:
 	$(PYTEST) tests/ -v --tb=short
+
+test-e2e:
+	$(PYTEST) tests/e2e/ -v --tb=short
 
 coverage:
 	$(PYTEST) tests/ -m "not integration" --cov=matrixtui --cov-report=json:coverage-summary.json --tb=short
