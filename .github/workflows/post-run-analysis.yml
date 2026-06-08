@@ -46,8 +46,14 @@ jobs:
             ~/.npm
             ~/.cache/pip
             node_modules
+            .venv
           key: postrun-deps-${{ inputs.ref }}
           restore-keys: postrun-deps-
+
+      # coverage_trend and regression_count invoke `make coverage` / `make test-report`, which
+      # use .venv/bin/pytest. Without this step those scripts silently produce all-null results.
+      - name: Set up project venv
+        run: make setup
 
       - name: Run objective trend scripts
         run: |
