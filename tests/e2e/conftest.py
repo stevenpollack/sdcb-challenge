@@ -18,7 +18,7 @@ from playwright.async_api import Browser, BrowserContext, Page, async_playwright
 _HEADLESS = os.environ.get("PLAYWRIGHT_HEADLESS", "0") == "1"
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-E2E_PORT = 8765
+E2E_PORT = int(os.environ.get("E2E_PORT", "8765"))
 BASE_URL = f"http://localhost:{E2E_PORT}"
 
 # Disable WebGL so xterm.js falls back to its DOM renderer, which puts each
