@@ -49,14 +49,6 @@ jobs:
           key: postrun-deps-${{ inputs.ref }}
           restore-keys: postrun-deps-
 
-      - name: Prepare eval config
-        run: |
-          cp eval/eval.config.example.json eval/eval.config.json
-          echo "::warning::Using DEFAULT source_globs (src/lib/tests/test). If the model's code"
-          echo "::warning::lives elsewhere, commit-size/complexity/duplication will silently read"
-          echo "::warning::as ZERO. Edit eval/eval.config.json source_globs + complexity.source_dirs"
-          echo "::warning::to the model's actual layout, commit it, and re-run before trusting trends."
-
       - name: Run objective trend scripts
         run: |
           set +e   # individual scripts may partially fail (e.g. a commit whose suite errors); keep going
