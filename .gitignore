@@ -1,4 +1,5 @@
 .env.local
+
 # harness outputs (generated when grading)
 commit_size.json
 duplication_trend.json
@@ -6,8 +7,7 @@ complexity_trend.json
 coverage_trend.json
 regression_count.json
 collapse.json
-# evaluator's filled config
-eval/eval.config.json
+
 # common build/coverage artifacts
 node_modules/
 dist/

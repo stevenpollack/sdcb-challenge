@@ -46,16 +46,14 @@ jobs:
             ~/.npm
             ~/.cache/pip
             node_modules
+            .venv
           key: postrun-deps-${{ inputs.ref }}
           restore-keys: postrun-deps-
 
-      - name: Prepare eval config
-        run: |
-          cp eval/eval.config.example.json eval/eval.config.json
-          echo "::warning::Using DEFAULT source_globs (src/lib/tests/test). If the model's code"
-          echo "::warning::lives elsewhere, commit-size/complexity/duplication will silently read"
-          echo "::warning::as ZERO. Edit eval/eval.config.json source_globs + complexity.source_dirs"
-          echo "::warning::to the model's actual layout, commit it, and re-run before trusting trends."
+      # coverage_trend and regression_count invoke `make coverage` / `make test-report`, which
+      # use .venv/bin/pytest. Without this step those scripts silently produce all-null results.
+      - name: Set up project venv
+        run: make setup
 
       - name: Run objective trend scripts
         run: |

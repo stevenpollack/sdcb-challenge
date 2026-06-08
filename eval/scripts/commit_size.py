@@ -42,9 +42,13 @@ def main():
     sizes = [(sha, subj, commit_churn(repo, sha, cfg)) for sha, subj in commits]
 
     n = len(sizes)
-    first_third = [s for _, _, s in sizes[: max(1, n // 3)]]
-    base_median = median(first_third) if first_third else 0
-    threshold = 2 * base_median
+    # Oversize should mean "unusually large FOR THIS PROJECT", not "larger than the empty scaffold".
+    # Basing the threshold on the first third compares real feature commits against initial/scaffold
+    # commits (near-zero churn), so everything trips. Use the median of substantive (nonzero-churn)
+    # commits instead.
+    nonzero = [s for _, _, s in sizes if s > 0]
+    base_median = median(nonzero) if nonzero else 0
+    threshold = 3 * base_median  # 3x the typical substantive commit
 
     rows = []
     for i, (sha, subj, size) in enumerate(sizes):
@@ -52,10 +56,17 @@ def main():
         rows.append([i, sha[:8], size, flag, subj[:48]])
 
     print_table(["idx", "sha", "churn", "flag", "subject"], rows)
-    print(f"\nfirst-third median churn: {base_median}  | oversize threshold (2x): {threshold}")
+    print(f"\nnonzero median churn: {base_median}  | oversize threshold (3x): {threshold}")
+
+    total_churn = sum(s for _, _, s in sizes)
+    if total_churn == 0 and len(sizes) > 1:
+        print("\n*** WARNING: total source churn across ALL commits is 0. This almost certainly\n"
+              "    means source_globs does not match where the code lives. Check eval.config.json\n"
+              "    'source_globs' against the model's actual layout — the commit-size signal is\n"
+              "    meaningless until this is fixed. ***", file=sys.stderr)
 
     out = {
-        "base_median_first_third": base_median,
+        "base_median_nonzero": base_median,
         "oversize_threshold": threshold,
         "commits": [
             {"idx": i, "sha": sha, "subject": subj, "churn": size,

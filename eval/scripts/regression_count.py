@@ -47,7 +47,12 @@ from _common import (load_config, load_meta, feature_commits, checkout, current_
 
 
 def parse_junit(path):
-    """Return {test_id: passed_bool}. test_id = classname::name for stability."""
+    """Return {test_id: state} where state is 'pass' | 'fail' | 'skip'.
+
+    Skips are tracked distinctly: a skipped test is neither a pass nor a fail, and must not
+    pollute the pass->fail regression comparison or the removed-test count (tests skip in/out
+    across commits depending on env/network, which is not a regression and not a deletion).
+    """
     if not os.path.exists(path):
         return None
     results = {}
@@ -59,11 +64,15 @@ def parse_junit(path):
         cls = tc.attrib.get("classname", "")
         name = tc.attrib.get("name", "")
         tid = f"{cls}::{name}"
-        failed = any(child.tag in ("failure", "error") for child in tc)
-        status = tc.attrib.get("status", "")
-        if status and status.lower() not in ("passed", "run", ""):
-            failed = True
-        results[tid] = not failed
+        children = [child.tag for child in tc]
+        status = tc.attrib.get("status", "").lower()
+        if "skipped" in children or status in ("skipped", "notrun", "disabled"):
+            results[tid] = "skip"
+        elif any(t in ("failure", "error") for t in children) or (
+                status and status not in ("passed", "run", "")):
+            results[tid] = "fail"
+        else:
+            results[tid] = "pass"
     return results
 
 
@@ -88,7 +97,10 @@ def main():
     commits = feature_commits(repo, cfg)
     origin = current_ref(repo)
     results = []
-    last_good = {}   # test_id -> True, the most recent passing state we've seen
+    # last_pass[t] = True once we've seen t pass; only flips off when we count a regression for it.
+    last_pass = {}
+    # ever_seen tracks any test_id we've observed in a non-skip state (to detect genuine drops).
+    ever_seen = set()
     prev_exit = None
 
     try:
@@ -97,7 +109,6 @@ def main():
             exit_code = run_tests(repo, cmd, junit_path)
 
             if fmt == "exit-code":
-                # coarse: regression = was-green, now-red
                 regressed = 1 if (prev_exit == 0 and exit_code != 0) else 0
                 prev_exit = exit_code
                 results.append({"idx": i, "sha": sha, "subject": subj,
@@ -112,51 +123,76 @@ def main():
                                 "regressions_introduced": None})
                 continue
 
-            regressions = [t for t, passed_now in cur.items()
-                           if not passed_now and last_good.get(t) is True]
-            new_tests = [t for t in cur if t not in last_good]
-            newly_passing = [t for t, p in cur.items()
-                             if p and last_good.get(t) is False]
-            removed = [t for t in last_good if t not in cur]
+            present_nonskip = {t for t, s in cur.items() if s != "skip"}
 
-            # advance last_good: record current passing tests as the new known-good baseline
-            for t, p in cur.items():
-                if p:
-                    last_good[t] = True
-                else:
-                    # keep its prior known-good status so it still counts as regressed until fixed-once
-                    last_good.setdefault(t, False)
-                    if last_good[t] is True:
-                        last_good[t] = False  # mark broken so we don't double-count next commit
+            # REGRESSION: a test that previously passed is now present AND failing.
+            regressions = [t for t, s in cur.items()
+                           if s == "fail" and last_pass.get(t)]
+
+            # DROPPED: a test that previously passed is now entirely absent (not skipped, gone).
+            # This is the deletion-to-hide-a-failure case the old script missed. Skips don't count.
+            dropped = [t for t in last_pass
+                       if last_pass[t] and t not in cur]
+
+            new_tests = [t for t in present_nonskip if t not in ever_seen]
+            skipped_now = [t for t, s in cur.items() if s == "skip"]
+
+            # advance state
+            for t, s in cur.items():
+                if s == "pass":
+                    last_pass[t] = True
+                    ever_seen.add(t)
+                elif s == "fail":
+                    ever_seen.add(t)
+                    if last_pass.get(t):
+                        last_pass[t] = False  # counted once; don't double-count while it stays red
+                # skip: leave last_pass untouched (don't treat as pass or fail)
+            # a dropped test should stop counting after we've flagged it once
+            for t in dropped:
+                last_pass[t] = False
 
             results.append({
                 "idx": i, "sha": sha, "subject": subj,
-                "n_tests": len(cur),
+                "n_tests_present": len(cur),
+                "n_nonskip": len(present_nonskip),
+                "n_skipped": len(skipped_now),
                 "regressions_introduced": len(regressions),
                 "regressed_tests": regressions,
+                "dropped_passing_tests": len(dropped),
+                "dropped_tests": dropped[:20],  # cap list size
                 "new_tests": len(new_tests),
-                "newly_passing": len(newly_passing),
-                "removed_tests": len(removed),
             })
     finally:
         restore(repo, origin)
 
     rows = []
     total_reg = 0
+    total_dropped = 0
     for r in results:
         reg = r.get("regressions_introduced")
         if isinstance(reg, int):
             total_reg += reg
+        drp = r.get("dropped_passing_tests", 0)
+        if isinstance(drp, int):
+            total_dropped += drp
         rows.append([r["idx"], r["sha"][:8],
-                     r.get("n_tests", "-"),
+                     r.get("n_nonskip", r.get("n_tests", "-")),
                      "?" if reg is None else reg,
+                     drp if r.get("dropped_passing_tests") is not None else "-",
                      r.get("new_tests", "-"),
-                     r["subject"][:38]])
-    print_table(["idx", "sha", "#tests", "regr", "new", "subject"], rows)
-    print(f"\ntotal regressions introduced across history: {total_reg}")
+                     r["subject"][:34]])
+    print_table(["idx", "sha", "#tests", "regr", "drop", "new", "subject"], rows)
+    print(f"\ntotal regressions (pass->fail in place): {total_reg}")
+    print(f"total dropped passing tests (deleted while green): {total_dropped}")
+    if total_dropped:
+        print("*** NOTE: dropped passing tests can indicate failures hidden by deletion. "
+              "Inspect the 'dropped_tests' lists before trusting a low regression count. ***",
+              file=sys.stderr)
 
     with open("regression_count.json", "w") as f:
-        json.dump({"total_regressions": total_reg, "commits": results}, f, indent=2)
+        json.dump({"total_regressions": total_reg,
+                   "total_dropped_passing": total_dropped,
+                   "commits": results}, f, indent=2)
     print("wrote regression_count.json")
 
 
