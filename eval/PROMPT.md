@@ -15,8 +15,18 @@ yours.
    call `partial` or `broken`. False `working` claims are penalized heavily.
 2. **Functionality.** For each `working` feature, does it actually work against the live homeserver
    / in the TUI?
-3. **Test quality.** Coverage is measured. Tests written only to pass trivially are discounted. At
-   least one real integration test against the live homeserver is required.
+3. **Test quality.** Coverage is measured. Tests written only to pass trivially are discounted.
+   You must include integration tests that run against the **real** homeserver in `.env.local`,
+   and they must demonstrate, at minimum, all of the following live behaviors — a mock or fake
+   homeserver does NOT satisfy these:
+   - **Real-time receive:** a message sent by another user appears in your client without a manual
+     refresh, within a few seconds.
+   - **Send round-trip:** a message you send is accepted by the server and visible on sync.
+   - **Reconnect resumes sync:** after a dropped connection, your client resumes receiving new
+     messages.
+   The evaluator independently verifies real-time receive against the live server using two real
+   accounts; a submission whose TUI does not display a message the real server delivered is a
+   functional failure, no matter what your own test suite reports.
 4. **Extensibility.** After your run, a fresh model with no memory of your work will be asked to
    add new features to your codebase, cold, using only your code and docs. How easily it succeeds
    is a primary score.

@@ -44,6 +44,23 @@ homeserver / in the TUI and records binary works/doesn't. Write the per-feature 
 you check it, so the result is reproducible. This ground truth feeds the false-`working` rate and
 the verified-working count.
 
+**This check, not the static metrics, decides pass/fail.** A submission can pass every automated
+gate (starts, has tests, high coverage, no regressions) and still fail here — that has happened.
+The static trend scripts are forensics consulted *after* this check, to explain how a build got
+where it did; they never substitute for it.
+
+Mandatory parts of the functional check:
+
+- **Live two-party sync (`eval/scripts/live_sync_check.py`).** Run by the evaluator with two real
+  test accounts. CHECK 1 verifies the homeserver itself delivers a message between the two accounts
+  (proves the infra is real — if it fails, fix infra, don't judge the model). CHECK 2 launches the
+  model's app as one user, has the second user send a message, and asserts the model's TUI displays
+  it within the timeout. CHECK 2 failing is a functional FAIL regardless of the model's own tests —
+  it catches an app that passes against a mock but does nothing against the real server.
+- **Rendering / usability.** Launch the TUI and confirm the basics a human needs: the message input
+  is visible and focusable, sent messages appear, the room/message panes render. A launching app is
+  not necessarily a usable one (a submission shipped with the input box obscured); do not skip this.
+
 ## Extensibility test (primary judged metric)
 
 Freeze the final repo. Give a **fresh model instance** (no memory of the run) the held-out tasks in
