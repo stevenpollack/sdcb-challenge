@@ -1,0 +1,46 @@
+{
+  "repo_path": ".",
+  "_comment_feature_commits": "Which commits count for trend metrics. mode 'exclude' counts everything EXCEPT subjects matching exclude_regex (chore/docs/style/revert/merge \u2014 non-substantive). mode 'regex' (subject_regex) is the inverse allowlist. mode 'all' counts every commit.",
+  "feature_commits": {
+    "mode": "exclude",
+    "exclude_regex": "^(chore|docs|style|revert)(\\(.+\\))?:|^Merge ",
+    "_unused_subject_regex": "^(feat|fix|refactor|perf|test)(\\(.+\\))?:"
+  },
+  "_comment_make": "The model must provide these targets (see PROMPT.md). The harness calls them; you normally do not edit this. Override only if a run's Makefile deviates.",
+  "make": {
+    "test": "make test",
+    "coverage": "make coverage",
+    "test_report": "make test-report"
+  },
+  "_comment_meta": "Report paths/formats are read from the target repo's eval.meta.json, which the model writes. These are fallbacks if eval.meta.json is missing a field.",
+  "meta_file": "eval.meta.json",
+  "fallback_coverage_report": "coverage-summary.json",
+  "fallback_coverage_format": "jest-json-summary",
+  "fallback_junit_report": "junit.xml",
+  "_comment_complexity": "lizard scans these dirs (language-agnostic).",
+  "complexity": {
+    "source_dirs": [
+      "src"
+    ]
+  },
+  "_comment_duplication": "jscpd scans these dirs (polyglot).",
+  "duplication": {
+    "source_dirs": [
+      "src"
+    ]
+  },
+  "source_globs": [
+    "src/**",
+    "lib/**",
+    "tests/**",
+    "test/**"
+  ],
+  "exclude_globs": [
+    "**/package-lock.json",
+    "**/yarn.lock",
+    "**/*.snap",
+    "**/dist/**",
+    "**/node_modules/**"
+  ],
+  "_comment_layout": "Run scripts from the REPO ROOT, passing this file: python eval/scripts/commit_size.py eval/eval.config.json. repo_path is the model's code root (repo root). meta_file is read from repo root."
+}
