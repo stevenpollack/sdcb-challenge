@@ -202,17 +202,23 @@ class MatrixTUIApp(App):
         self._set_status(f"Logged in as {cfg['user']}")
         self.sub_title = cfg["user"]
 
-        # Load initial rooms
+        # Initial sync so rooms have display names and we establish next_batch
+        await self._matrix._client.sync(timeout=10000)
+
+        # Load initial rooms and update UI directly (we're in the event loop)
         rooms = await self._matrix.get_rooms()
-        self._handle_room_update(rooms)
+        self._on_rooms_updated(rooms)
 
         # Start real-time sync
         await self._matrix.start_sync()
 
-    # ------------------------------------------------------------------ message handlers (thread-safe)
+    # ------------------------------------------------------------------ message handlers
+    # nio callbacks fire as coroutines inside the same asyncio event loop that
+    # Textual owns. call_from_thread() is only for actual OS threads. Use
+    # call_later() to schedule a synchronous UI update on the next tick.
 
     def _handle_message(self, msg: Message) -> None:
-        self.call_from_thread(self._on_message_received, msg)
+        self.call_later(self._on_message_received, msg)
 
     def _on_message_received(self, msg: Message) -> None:
         if self.current_room and msg.room_id == self.current_room.room_id:
@@ -222,7 +228,7 @@ class MatrixTUIApp(App):
             self._refresh_room_list()
 
     def _handle_typing(self, room_id: str, typers: list[str]) -> None:
-        self.call_from_thread(self._on_typing_updated, room_id, typers)
+        self.call_later(self._on_typing_updated, room_id, typers)
 
     def _on_typing_updated(self, room_id: str, typers: list[str]) -> None:
         self._typing_users[room_id] = typers
@@ -230,7 +236,7 @@ class MatrixTUIApp(App):
             self._update_typing_status()
 
     def _handle_room_update(self, rooms: list[Room]) -> None:
-        self.call_from_thread(self._on_rooms_updated, rooms)
+        self.call_later(self._on_rooms_updated, rooms)
 
     def _on_rooms_updated(self, rooms: list[Room]) -> None:
         self._rooms = rooms
