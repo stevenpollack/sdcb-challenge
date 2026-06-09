@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 def pytest_configure(config):
-    """Load .env.local once, before any test runs."""
+    """Load all vars from .env.local once, before any test runs."""
     repo_root = Path(__file__).parent.parent
     env_file = repo_root / ".env.local"
     if env_file.exists():
@@ -17,7 +17,7 @@ def pytest_configure(config):
                 k, _, v = line.partition("=")
                 k = k.strip()
                 v = v.strip().strip("'\"")
-                if k and k not in os.environ:
+                if k:  # always set — allow .env.local to override stale env
                     os.environ[k] = v
 
 
