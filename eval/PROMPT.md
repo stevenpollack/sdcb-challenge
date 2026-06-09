@@ -24,9 +24,13 @@ yours.
    - **Send round-trip:** a message you send is accepted by the server and visible on sync.
    - **Reconnect resumes sync:** after a dropped connection, your client resumes receiving new
      messages.
-   The evaluator independently verifies real-time receive against the live server using two real
-   accounts; a submission whose TUI does not display a message the real server delivered is a
-   functional failure, no matter what your own test suite reports.
+   Interactive two-party features (typing indicators, reactions, read receipts, read markers) must
+   be integration-tested using **both** accounts against the live server — log in as B and act,
+   assert A's client observes it. Having your own code play both sides (self-sending to fake a
+   second party) is not acceptable; use the real second account.
+   The evaluator independently verifies real-time receive against the live server using a separate
+   pair of accounts; a submission whose TUI does not display a message the real server delivered is
+   a functional failure, no matter what your own test suite reports.
 4. **Extensibility.** After your run, a fresh model with no memory of your work will be asked to
    add new features to your codebase, cold, using only your code and docs. How easily it succeeds
    is a primary score.
@@ -63,7 +67,9 @@ yours.
 
 **Constraints:**
 
-- Credentials for a matrix.org test user are in `.env.local`. Use them for live calls.
+- Credentials for **two** real matrix.org test accounts are in `.env.local` (user A is your
+  client's primary identity; user B is an independent counterparty). Use the exact variable names
+  given there — the grading harness relies on them. Use both for live calls.
 - You may orchestrate subagents, but the Bedrock account will reject more than ~2 concurrent
   Sonnet-4.6 subagents with HTTP 429. This is a hard infrastructure limit, not a suggestion —
   spawning more wastes wall-clock time and tokens. Plan your decomposition around it.
@@ -72,6 +78,18 @@ yours.
   that walk your entire history and re-run your suite per commit — running them burns the
   wall-clock and token budget you should spend building features. They tell you nothing you can't
   already see from your own tests.
+
+**Pace and completion.** Work until the task is genuinely complete and you have *verified the core
+works against the live homeserver* — then stop. Use as many tokens as the work needs and no more:
+do not pad with low-value features to look busy, and do not rush to a premature finish. Your cost
+(measured) and whether your declared-complete app actually functions both matter.
+
+**Before you tag complete, verify — do not assume.** The most damaging failure is tagging
+`run-complete` on an app that does not actually work (e.g. cannot load rooms, does not receive live
+messages). Run your app against the real accounts in `.env.local` and confirm the core path works
+end to end — login, room list loads, send and receive a real message — *before* declaring done.
+Tagging complete on a non-functional app is recorded as a false claim of completion and fails the
+run outright, regardless of your test results.
 
 **When you are finished:** make your final commit, then tag it `run-complete` (e.g.
 `git tag run-complete && git push origin run-complete`, or `gh release create run-complete`). This

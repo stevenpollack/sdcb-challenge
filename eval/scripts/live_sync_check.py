@@ -23,10 +23,20 @@ two independent checks:
     scanning the terminal output for the unique token. This is what a mock cannot fake.
 
 Usage:
-  export MATRIX_HOMESERVER=https://matrix.org
-  export MATRIX_USER_A=@testuser1:matrix.org   MATRIX_PASS_A=...
-  export MATRIX_USER_B=@testuser2:matrix.org   MATRIX_PASS_B=...
+  # Credentials are read from .env.local by default (the same file the model used).
   python eval/scripts/live_sync_check.py [--timeout 30] [--tui-cmd "make run"] [--server-only]
+
+  # To grade with a SEPARATE evaluator pair (not the model's accounts), override via env vars,
+  # which take precedence over .env.local:
+  MATRIX_USER_A=@evaluator1:matrix.org MATRIX_PASSWORD_A=... \
+  MATRIX_USER_B=@evaluator2:matrix.org MATRIX_PASSWORD_B=... \
+  python eval/scripts/live_sync_check.py
+
+  # Or point at a different dotenv file:
+  python eval/scripts/live_sync_check.py --env-file .env.evaluator
+
+Expected keys (in .env.local or the environment): MATRIX_HOMESERVER, MATRIX_USER_A,
+MATRIX_PASSWORD_A, MATRIX_USER_B, MATRIX_PASSWORD_B.
 
 Exit code 0 only if all selected checks pass. Writes live_sync_check.json.
 """
@@ -42,6 +52,34 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+
+
+def load_dotenv(path=".env.local"):
+    """Minimal .env parser (stdlib only). Returns {key: value}. Does not override real env vars.
+
+    Handles KEY=value, optional `export ` prefix, # comments, and single/double quotes. Ignores
+    blank lines and malformed entries.
+    """
+    env = {}
+    if not os.path.exists(path):
+        return env
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("export "):
+                line = line[len("export "):]
+            if "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key = key.strip()
+            val = val.strip()
+            if len(val) >= 2 and val[0] == val[-1] and val[0] in ("'", '"'):
+                val = val[1:-1]
+            if key:
+                env[key] = val
+    return env
 
 
 def _req(method, url, token=None, body=None, timeout=60):
@@ -219,13 +257,21 @@ def main():
     ap.add_argument("--tui-cmd", default="make run", help="command that launches the model's TUI")
     ap.add_argument("--server-only", action="store_true",
                     help="run only CHECK 1 (verify infra), skip launching the model's app")
+    ap.add_argument("--env-file", default=".env.local",
+                    help="dotenv file to read credentials from (default: .env.local)")
     args = ap.parse_args()
 
-    hs = os.environ.get("MATRIX_HOMESERVER", "https://matrix.org")
-    ua, pa = os.environ.get("MATRIX_USER_A"), os.environ.get("MATRIX_PASS_A")
-    ub, pb = os.environ.get("MATRIX_USER_B"), os.environ.get("MATRIX_PASS_B")
+    # Credentials resolve from .env.local by default; any real exported env var overrides the file.
+    dot = load_dotenv(args.env_file)
+    def cred(key):
+        return os.environ.get(key) or dot.get(key)
+
+    hs = cred("MATRIX_HOMESERVER") or "https://matrix.org"
+    ua, pa = cred("MATRIX_USER_A"), cred("MATRIX_PASSWORD_A")
+    ub, pb = cred("MATRIX_USER_B"), cred("MATRIX_PASSWORD_B")
     if not all([ua, pa, ub, pb]):
-        sys.exit("set MATRIX_USER_A/PASS_A and MATRIX_USER_B/PASS_B (and MATRIX_HOMESERVER)")
+        sys.exit(f"missing credentials: need MATRIX_USER_A/PASSWORD_A and "
+                 f"MATRIX_USER_B/PASSWORD_B in {args.env_file} or the environment")
 
     a = MatrixClient(hs, ua, pa).login()
     b = MatrixClient(hs, ub, pb).login()
@@ -239,11 +285,13 @@ def main():
               "infrastructure or credentials are the problem; fix before judging the model.",
               file=sys.stderr)
 
-    # The model's app needs the SAME room A is in, and A's credentials. The model is expected to
-    # read these from .env.local exactly as during the run.
+    # The model's app reads credentials from .env.local under these exact names (see
+    # .env.local.example). Feed the evaluator's accounts through the same contract so the app
+    # launches as user A with user B available exactly as during the run.
     env_for_tui = {
         "MATRIX_HOMESERVER": hs,
-        "MATRIX_USER": ua, "MATRIX_PASSWORD": pa,
+        "MATRIX_USER_A": ua, "MATRIX_PASSWORD_A": pa,
+        "MATRIX_USER_B": ub, "MATRIX_PASSWORD_B": pb,
     }
     if not args.server_only:
         if not truth["passed"]:

@@ -20,14 +20,22 @@ After the run (evaluator):
 
 ## Live functional check (the actual pass/fail)
 
-Run AFTER freezing the repo, against the real homeserver, with your TWO test accounts:
+Run AFTER freezing the repo, against the real homeserver. Credentials are read from `.env.local`
+by default (the file the model already used), so no exports are needed:
 
 ```
-export MATRIX_HOMESERVER=https://matrix.org
-export MATRIX_USER_A=@testuser1:matrix.org  MATRIX_PASS_A=...
-export MATRIX_USER_B=@testuser2:matrix.org  MATRIX_PASS_B=...
 make setup                     # install the model's deps so `make run` works
 python eval/scripts/live_sync_check.py --timeout 30 --tui-cmd "make run"
+```
+
+To grade with a SEPARATE evaluator pair instead of the model's accounts, override via env vars
+(they take precedence over `.env.local`) or point at another dotenv file:
+
+```
+MATRIX_USER_A=@evaluator1:matrix.org MATRIX_PASSWORD_A=... \
+MATRIX_USER_B=@evaluator2:matrix.org MATRIX_PASSWORD_B=... \
+python eval/scripts/live_sync_check.py --tui-cmd "make run"
+# or:  python eval/scripts/live_sync_check.py --env-file .env.evaluator --tui-cmd "make run"
 ```
 
 - CHECK 1 (server truth) failing = your infra/creds problem, not the model's. Fix and rerun.
@@ -35,8 +43,8 @@ python eval/scripts/live_sync_check.py --timeout 30 --tui-cmd "make run"
   regardless of coverage/regressions/collapse. This is what catches "passes its own mock, not the
   real server."
 - Use `--server-only` to validate infra before a run.
-- The script feeds the model A's credentials via env (MATRIX_USER/PASSWORD) exactly as `.env.local`
-  did during the run. If the model reads credentials under different names, pass a matching
-  `--tui-cmd` wrapper or adjust the env in the script's `env_for_tui`.
+- The script feeds the model both accounts via env (MATRIX_USER_A/PASSWORD_A and
+  MATRIX_USER_B/PASSWORD_B) under the same names as `.env.local`. If the model reads credentials
+  under different names, pass a matching `--tui-cmd` wrapper or adjust `env_for_tui` in the script.
 - Also do the manual rendering check: launch the TUI, confirm the input box is visible/focusable
   and messages render. A launching app is not necessarily usable.
