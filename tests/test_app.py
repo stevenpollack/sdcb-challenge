@@ -122,3 +122,21 @@ async def test_focus_input_action():
     async with app.run_test() as pilot:
         await pilot.press("ctrl+k")
         assert pilot.app.focused == pilot.app.query_one("#message-input")
+
+
+@pytest.mark.asyncio
+async def test_room_item_shows_unread_count():
+    """RoomItem label includes unread count badge when count > 0."""
+    room = Room("!r:example.com", "General", 5)
+    item = RoomItem(room, unread_count=3)
+    label = item._label()
+    assert "(3)" in label
+
+
+@pytest.mark.asyncio
+async def test_room_item_no_unread_badge():
+    """RoomItem label has no badge when unread count is 0."""
+    room = Room("!r:example.com", "General", 5)
+    item = RoomItem(room, unread_count=0)
+    label = item._label()
+    assert "(" not in label

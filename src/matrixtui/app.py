@@ -30,21 +30,25 @@ logger = logging.getLogger(__name__)
 class RoomItem(ListItem):
     """A room entry in the sidebar."""
 
-    def __init__(self, room: Room) -> None:
+    def __init__(self, room: Room, unread_count: int = 0) -> None:
         super().__init__()
         self.room = room
+        self.unread_count = unread_count
 
     def compose(self) -> ComposeResult:
         yield Label(self._label())
 
     def _label(self) -> str:
         name = self.room.display_name or self.room.room_id
-        if len(name) > 28:
-            name = name[:25] + "..."
-        return name
+        badge = f" ({self.unread_count})" if self.unread_count > 0 else ""
+        max_name = 28 - len(badge)
+        if len(name) > max_name:
+            name = name[:max_name - 3] + "..."
+        return name + badge
 
-    def refresh_label(self, room: Room) -> None:
+    def refresh_label(self, room: Room, unread_count: int = 0) -> None:
         self.room = room
+        self.unread_count = unread_count
         self.query_one(Label).update(self._label())
 
 
@@ -149,6 +153,7 @@ class MatrixTUIApp(App):
         self._matrix: Optional[MatrixClient] = None
         self._rooms: list[Room] = []
         self._joining = False
+        self._typing_users: dict[str, list[str]] = {}  # room_id -> [user_ids]
 
     # ------------------------------------------------------------------ compose
 
@@ -186,6 +191,7 @@ class MatrixTUIApp(App):
             password=cfg["password"],
             on_message=self._handle_message,
             on_room_update=self._handle_room_update,
+            on_typing=self._handle_typing,
         )
         try:
             await self._matrix.login()
@@ -211,11 +217,17 @@ class MatrixTUIApp(App):
     def _on_message_received(self, msg: Message) -> None:
         if self.current_room and msg.room_id == self.current_room.room_id:
             self._append_message(msg)
-        # Update room list to show activity
-        for item in self.query("#room-list ListItem").results(RoomItem):
-            if item.room.room_id == msg.room_id:
-                # Mark as having new activity
-                break
+        else:
+            # Refresh sidebar to show updated unread badge
+            self._refresh_room_list()
+
+    def _handle_typing(self, room_id: str, typers: list[str]) -> None:
+        self.call_from_thread(self._on_typing_updated, room_id, typers)
+
+    def _on_typing_updated(self, room_id: str, typers: list[str]) -> None:
+        self._typing_users[room_id] = typers
+        if self.current_room and self.current_room.room_id == room_id:
+            self._update_typing_status()
 
     def _handle_room_update(self, rooms: list[Room]) -> None:
         self.call_from_thread(self._on_rooms_updated, rooms)
@@ -230,8 +242,10 @@ class MatrixTUIApp(App):
 
         lv.clear()
         selected_index = None
+        unread = self._matrix.unread_counts if self._matrix else {}
         for i, room in enumerate(sorted(self._rooms, key=lambda r: r.display_name.lower())):
-            lv.append(RoomItem(room))
+            item = RoomItem(room, unread_count=unread.get(room.room_id, 0))
+            lv.append(item)
             if room.room_id == current_id:
                 selected_index = i
 
@@ -239,6 +253,20 @@ class MatrixTUIApp(App):
             lv.index = selected_index
 
     # ------------------------------------------------------------------ UI helpers
+
+    def _update_typing_status(self) -> None:
+        if not self.current_room:
+            return
+        typers = self._typing_users.get(self.current_room.room_id, [])
+        if typers and self._matrix:
+            names = ", ".join(self._matrix.get_display_name(u) for u in typers[:3])
+            suffix = " are typing…" if len(typers) > 1 else " is typing…"
+            self._set_status(names + suffix)
+        else:
+            # Restore connected status
+            user = self._config.get("user", "")
+            if self._matrix and self._matrix.connected:
+                self._set_status(f"Logged in as {user}")
 
     def _append_message(self, msg: Message) -> None:
         view = self.query_one("#message-view", MessageView)
@@ -270,8 +298,23 @@ class MatrixTUIApp(App):
         view = self.query_one("#message-view", MessageView)
         view.clear()
         view.write(f"--- {room.display_name} ---")
+        # Clear unread count for this room
+        if self._matrix:
+            self._matrix.clear_unread(room.room_id)
+        self._refresh_room_list()
         self.run_worker(self._load_history(room.room_id), name="history", exit_on_error=False)
         self.query_one("#message-input", Input).focus()
+
+    async def on_input_changed(self, event: Input.Changed) -> None:
+        """Send typing notification when user types."""
+        if event.input.id != "message-input" or not self.current_room or not self._matrix:
+            return
+        typing = bool(event.value)
+        self.run_worker(
+            self._matrix.send_typing(self.current_room.room_id, typing),
+            name="typing",
+            exit_on_error=False,
+        )
 
     @work(exit_on_error=False)
     async def _load_history(self, room_id: str) -> None:

@@ -12,6 +12,7 @@ from nio import (
     MatrixRoom,
     RoomMessageText,
     RoomMemberEvent,
+    TypingNoticeEvent,
     SyncError,
     RoomSendResponse,
     JoinedRoomsResponse,
@@ -50,18 +51,22 @@ class MatrixClient:
         password: str,
         on_message: Optional[Callable[[Message], None]] = None,
         on_room_update: Optional[Callable[[list[Room]], None]] = None,
+        on_typing: Optional[Callable[[str, list[str]], None]] = None,
     ) -> None:
         self.homeserver = homeserver
         self.user_id = user_id
         self.password = password
         self.on_message = on_message
         self.on_room_update = on_room_update
+        self.on_typing = on_typing
 
         config = AsyncClientConfig(max_limit_exceeded=0, max_timeouts=0)
         self._client = AsyncClient(homeserver, user_id, config=config)
         self._sync_task: Optional[asyncio.Task] = None
         self._connected = False
         self._rooms: dict[str, Room] = {}
+        # unread counts per room_id (incremented on receive, reset on room select)
+        self.unread_counts: dict[str, int] = {}
 
     @property
     def connected(self) -> bool:
@@ -87,6 +92,7 @@ class MatrixClient:
         """Register callbacks and start sync loop in background."""
         self._client.add_event_callback(self._on_room_message, RoomMessageText)
         self._client.add_event_callback(self._on_room_member, RoomMemberEvent)
+        self._client.add_event_callback(self._on_typing, TypingNoticeEvent)
         self._sync_task = asyncio.create_task(self._sync_forever())
 
     async def stop(self) -> None:
@@ -125,12 +131,21 @@ class MatrixClient:
             event_id=event.event_id,
             timestamp=getattr(event, "server_timestamp", 0),
         )
+        # Track unread count (only for messages from other users)
+        if event.sender != self.user_id:
+            self.unread_counts[room.room_id] = self.unread_counts.get(room.room_id, 0) + 1
         await self._update_rooms()
         if self.on_message:
             self.on_message(msg)
 
     async def _on_room_member(self, room: MatrixRoom, event: RoomMemberEvent) -> None:
         await self._update_rooms()
+
+    async def _on_typing(self, room: MatrixRoom, event: TypingNoticeEvent) -> None:
+        # Filter out our own user from the typing list
+        typers = [uid for uid in event.users if uid != self.user_id]
+        if self.on_typing:
+            self.on_typing(room.room_id, typers)
 
     async def _update_rooms(self) -> None:
         rooms = []
@@ -197,3 +212,22 @@ class MatrixClient:
     def get_display_name(self, user_id: str) -> str:
         """Return short display name for a user."""
         return user_id.split(":")[0].lstrip("@")
+
+    def clear_unread(self, room_id: str) -> None:
+        """Reset unread count for a room (call when user opens it)."""
+        self.unread_counts.pop(room_id, None)
+
+    async def send_typing(self, room_id: str, typing: bool, timeout: int = 4000) -> None:
+        """Send a typing notification to the room."""
+        try:
+            await self._client.room_typing(room_id, typing_state=typing, timeout=timeout)
+        except Exception as exc:
+            logger.debug("Typing notification failed: %s", exc)
+
+    async def leave_room(self, room_id: str) -> None:
+        """Leave a room."""
+        from nio import RoomLeaveResponse
+        resp = await self._client.room_leave(room_id)
+        if not isinstance(resp, RoomLeaveResponse):
+            raise MatrixClientError(f"Leave failed: {resp}")
+        await self._update_rooms()
