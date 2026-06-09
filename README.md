@@ -1,62 +1,120 @@
-# Matrix TUI Benchmark — Workspace
+# matrixtui — Matrix Protocol TUI Client
 
-This is a benchmark workspace. You (the model under test) build a **terminal UI client for the
-Matrix protocol** here, at the repository root. Your performance is evaluated afterward by the
-harness in [`eval/`](eval/).
+A terminal user interface client for the [Matrix](https://matrix.org) protocol, built with
+[Textual](https://textual.textualize.io/) and [matrix-nio](https://github.com/matrix-nio/matrix-nio).
 
-## Read first
+## Features
 
-- [`eval/PROMPT.md`](eval/PROMPT.md) — your task, constraints, and required artifacts. **Start here.**
-- [`eval/EVALUATION.md`](eval/EVALUATION.md) — exactly how you will be scored. You are expected to
-  read this; a clear picture of evaluation is fair to have.
+- Login with password credentials
+- Room list sidebar (auto-updates on join/leave)
+- Real-time message delivery via `sync_forever` (no manual refresh)
+- Send messages with Enter
+- Load recent message history when switching rooms
+- Join rooms by alias or room ID (`Ctrl+R`)
+- Keyboard navigation
+- Reconnect / retry on transient sync errors
 
-## Where to work
+## Requirements
 
-- Build your application at the **repository root** (e.g. `src/`, `tests/`, your own layout).
-- **Do not modify anything under `eval/`.** Those are the harness and grading scripts.
-- Fill in the placeholder files described below.
+- Python 3.11+
+- `pip3` (system or virtualenv)
 
-## Files you must provide or complete
+## Quick Start (from a clean checkout)
 
-| File | Status in template | What to do |
-|---|---|---|
-| `Makefile` | stub with required targets | implement each target's body (see stub comments) |
-| `eval.meta.json` | example values | set your real report paths/formats |
-| `FEATURES.md` | empty ledger | append a row per feature with honest status |
-| `README` (yours) | this file | replace with your project's real README (setup must work from a clean checkout) |
-| `.env.local` | not present | created for you at run time with test credentials; do not commit it |
+```bash
+# 1. Install dependencies
+make setup
 
-## The contract the harness depends on
+# 2. Provide credentials
+cp .env.local.example .env.local
+# Edit .env.local and set MATRIX_HOMESERVER, MATRIX_USER, MATRIX_PASSWORD
 
-The grader calls your `Makefile` targets directly and reads `eval.meta.json` for report locations.
-If a required target is missing or misbehaves, that capability fails. See `Makefile` and
-`eval/PROMPT.md` for the exact list.
+# 3. Run the TUI
+make run
+```
 
-## When you are done (model)
+### Manual setup (without Make)
 
-Tag your final commit `run-complete` (`git tag run-complete && git push origin run-complete`). That
-freezes the history for grading. Don't commit after tagging, and don't run the `eval/` scripts
-yourself — they're post-run tooling and waste your time budget.
+```bash
+pip3 install -e ".[dev]"
+```
 
-## Evaluation (automated)
+### Running without Make
 
-- **Every push** runs `.github/workflows/checks.yml`: a hard contract gate (required files + Make
-  targets) plus an informational snapshot of current-HEAD tests and coverage in the run summary.
-- **Post-run**, the evaluator manually triggers `.github/workflows/post-run-analysis.yml` (Actions
-  tab → Run workflow), which analyzes the `run-complete` tag by default: commit-size, duplication,
-  complexity, coverage trends, regression count, and the collapse point, rendered into the run
-  summary and uploaded as JSON artifacts.
+```bash
+python3 -m matrixtui
+```
 
-## Running the harness manually (evaluator)
+## Credentials
 
-If you prefer running locally instead of via the workflow, from the repository root:
+Create `.env.local` in the repo root (it is gitignored):
 
 ```
-cp eval/eval.config.example.json eval/eval.config.json   # adjust source_globs to the model's stack
-python eval/scripts/commit_size.py        eval/eval.config.json
-python eval/scripts/duplication_trend.py  eval/eval.config.json
-python eval/scripts/complexity_trend.py   eval/eval.config.json
-python eval/scripts/coverage_trend.py     eval/eval.config.json
-python eval/scripts/regression_count.py   eval/eval.config.json
-python eval/scripts/collapse.py
+MATRIX_HOMESERVER=https://matrix.org
+MATRIX_USER=@youruser:matrix.org
+MATRIX_PASSWORD=yourpassword
 ```
+
+Optionally add a second account for two-party integration tests:
+
+```
+MATRIX_HOMESERVER_B=https://matrix.org
+MATRIX_USER_B=@seconduser:matrix.org
+MATRIX_PASSWORD_B=theirpassword
+```
+
+## Make Targets
+
+| Target | Description |
+|---|---|
+| `make setup` | Install all dependencies |
+| `make run` | Launch the TUI |
+| `make test` | Run the full test suite (exits non-zero on failure) |
+| `make coverage` | Run tests with coverage; writes `coverage-summary.json` |
+| `make test-report` | Run tests and emit `junit.xml` |
+| `make lint` | No-op lint target (exits 0) |
+
+## Keyboard Shortcuts
+
+| Key | Action |
+|---|---|
+| `Ctrl+Q` | Quit |
+| `Ctrl+J` | Focus room list |
+| `Ctrl+K` | Focus message input |
+| `Ctrl+R` | Join a room by alias or ID |
+| `Enter` | Send message / confirm |
+| `Escape` | Cancel input |
+
+## Architecture
+
+```
+src/matrixtui/
+├── __init__.py        # package metadata
+├── __main__.py        # python -m matrixtui entry point
+├── app.py             # Textual TUI application (MatrixTUIApp)
+├── config.py          # .env.local loader
+└── matrix_client.py   # matrix-nio wrapper (MatrixClient)
+
+tests/
+├── conftest.py            # shared fixtures, .env.local loading
+├── test_config.py         # unit tests for config loading
+├── test_matrix_client.py  # unit tests for MatrixClient (mocked nio)
+└── test_integration.py    # integration tests against the real homeserver
+```
+
+### Adding a Feature
+
+1. If it touches Matrix protocol: extend `MatrixClient` in `matrix_client.py`.
+2. If it touches the UI: extend `MatrixTUIApp` in `app.py`.
+3. Add unit tests in `test_matrix_client.py` (mock nio) and/or `test_config.py`.
+4. Add an integration test in `test_integration.py` if it touches the live server.
+5. Update `FEATURES.md` with the new feature row.
+
+### Key Design Decisions
+
+- **Thread safety**: `matrix-nio` callbacks run in the sync loop thread. The TUI runs in the
+  Textual event loop. All callbacks call `self.call_from_thread(...)` to post updates to the TUI.
+- **Single session per run**: Only one login per process. The `_sync_task` runs `sync_forever`
+  with exponential backoff on errors — no explicit reconnect timer needed.
+- **Rate limiting**: matrix.org enforces ~3 logins/minute per IP. Integration tests share a
+  module-scoped session fixture and reuse the access token for fresh clients to stay within limits.

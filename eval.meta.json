@@ -1,5 +1,5 @@
 {
   "coverage_report": "coverage-summary.json",
-  "coverage_format": "jest-json-summary",
+  "coverage_format": "pytest-cov-json",
   "junit_report": "junit.xml"
 }

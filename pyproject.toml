@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "matrixtui"
+version = "0.1.0"
+description = "Terminal UI client for the Matrix protocol"
+requires-python = ">=3.11"
+dependencies = [
+    "matrix-nio>=0.25",
+    "textual>=0.80",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4",
+    "pytest-timeout>=2",
+]
+
+[project.scripts]
+matrixtui = "matrixtui.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+timeout = 60
+addopts = "--tb=short"
+
+[tool.coverage.run]
+source = ["src/matrixtui"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+show_missing = true
