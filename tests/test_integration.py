@@ -116,9 +116,11 @@ def _make_client_with_token(
     c.password = ""
     c.on_message = on_message
     c.on_room_update = None
+    c.on_typing = None
     c._sync_task = None
     c._connected = True
     c._rooms = {}
+    c.unread_counts = {}
     config = AsyncClientConfig(max_limit_exceeded=0, max_timeouts=0)
     c._client = AsyncClient(homeserver, user_id, config=config)
     c._client.access_token = access_token
