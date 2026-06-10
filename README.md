@@ -1,62 +1,117 @@
-# Matrix TUI Benchmark — Workspace
+# Matrix TUI
 
-This is a benchmark workspace. You (the model under test) build a **terminal UI client for the
-Matrix protocol** here, at the repository root. Your performance is evaluated afterward by the
-harness in [`eval/`](eval/).
+A terminal UI client for the [Matrix](https://matrix.org) protocol, built with
+[Textual](https://textual.textualize.io/) and [matrix-nio](https://github.com/poljar/matrix-nio).
 
-## Read first
+## Requirements
 
-- [`eval/PROMPT.md`](eval/PROMPT.md) — your task, constraints, and required artifacts. **Start here.**
-- [`eval/EVALUATION.md`](eval/EVALUATION.md) — exactly how you will be scored. You are expected to
-  read this; a clear picture of evaluation is fair to have.
+- Python 3.11+
+- pip
 
-## Where to work
+## Setup
 
-- Build your application at the **repository root** (e.g. `src/`, `tests/`, your own layout).
-- **Do not modify anything under `eval/`.** Those are the harness and grading scripts.
-- Fill in the placeholder files described below.
+```bash
+# From a clean checkout:
+make setup
+# or equivalently:
+pip install -e ".[dev]"
+```
 
-## Files you must provide or complete
+## Configuration
 
-| File | Status in template | What to do |
-|---|---|---|
-| `Makefile` | stub with required targets | implement each target's body (see stub comments) |
-| `eval.meta.json` | example values | set your real report paths/formats |
-| `FEATURES.md` | empty ledger | append a row per feature with honest status |
-| `README` (yours) | this file | replace with your project's real README (setup must work from a clean checkout) |
-| `.env.local` | not present | created for you at run time with test credentials; do not commit it |
+Copy your credentials into `.env.local` at the project root:
 
-## The contract the harness depends on
+```ini
+MATRIX_HOMESERVER=https://matrix.org
+MATRIX_USER=@youruser:matrix.org
+MATRIX_PASSWORD=yourpassword
+MATRIX_HOMESERVER_B=https://matrix.org
+MATRIX_USER_B=@seconduser:matrix.org
+MATRIX_PASSWORD_B=secondpassword
+```
 
-The grader calls your `Makefile` targets directly and reads `eval.meta.json` for report locations.
-If a required target is missing or misbehaves, that capability fails. See `Makefile` and
-`eval/PROMPT.md` for the exact list.
+`.env.local` is loaded automatically on startup and during tests. It is git-ignored.
 
-## When you are done (model)
+## Running
 
-Tag your final commit `run-complete` (`git tag run-complete && git push origin run-complete`). That
-freezes the history for grading. Don't commit after tagging, and don't run the `eval/` scripts
-yourself — they're post-run tooling and waste your time budget.
+```bash
+make run
+# or:
+python -m matrixclient.main
+```
 
-## Evaluation (automated)
+## Keyboard shortcuts
 
-- **Every push** runs `.github/workflows/checks.yml`: a hard contract gate (required files + Make
-  targets) plus an informational snapshot of current-HEAD tests and coverage in the run summary.
-- **Post-run**, the evaluator manually triggers `.github/workflows/post-run-analysis.yml` (Actions
-  tab → Run workflow), which analyzes the `run-complete` tag by default: commit-size, duplication,
-  complexity, coverage trends, regression count, and the collapse point, rendered into the run
-  summary and uploaded as JSON artifacts.
+| Key | Action |
+|-----|--------|
+| `Ctrl+Q` | Quit |
+| `Ctrl+J` | Select next room |
+| `Ctrl+K` | Select previous room |
+| `Ctrl+L` | Focus message input |
+| `Escape` | Focus room list |
+| `F5` | Load older messages |
+| `Enter` (in input) | Send message |
 
-## Running the harness manually (evaluator)
+## Features
 
-If you prefer running locally instead of via the workflow, from the repository root:
+- Login with password; session established via matrix-nio
+- Room list with display names
+- Real-time message sync (long-poll)
+- Send text messages
+- Typing indicator — shown for other users, sent while you type
+- Reactions (send via API; displayed inline on messages)
+- Read receipts (sent on room selection; two-party tested)
+- Message redaction (delete) — shown as `[Message deleted]`
+- Message editing — edited content shown in place
+- Load older messages (F5)
+- Automatic reconnect on sync failure
+
+## Tests
+
+```bash
+# All tests (unit + integration):
+make test
+
+# With coverage report:
+make coverage
+
+# JUnit XML:
+make test-report
+```
+
+Integration tests require `.env.local` with both A and B credentials. They hit the live
+`matrix.org` homeserver.
+
+## Architecture
 
 ```
-cp eval/eval.config.example.json eval/eval.config.json   # adjust source_globs to the model's stack
-python eval/scripts/commit_size.py        eval/eval.config.json
-python eval/scripts/duplication_trend.py  eval/eval.config.json
-python eval/scripts/complexity_trend.py   eval/eval.config.json
-python eval/scripts/coverage_trend.py     eval/eval.config.json
-python eval/scripts/regression_count.py   eval/eval.config.json
-python eval/scripts/collapse.py
+src/matrixclient/
+  config.py   — loads credentials from .env.local
+  client.py   — async Matrix client wrapping matrix-nio (sync loop, send, reactions, …)
+  app.py      — Textual TUI: room list, message pane, input, typing bar
+  main.py     — entry point
+
+tests/
+  conftest.py          — shared fixtures (logged-in clients, shared room)
+  test_client_unit.py  — unit tests for data models
+  test_integration.py  — live-server integration tests
 ```
+
+### Extending the client
+
+To add a new feature:
+
+1. **Protocol layer** (`client.py`): add a method to `MatrixClient` (e.g. `async def send_foo()`).
+   Register any new nio callbacks in `_register_callbacks()`.
+2. **UI layer** (`app.py`): add a new `TxtMessage` subclass, a handler (`on_<message_class>`),
+   and any new widgets. Wire them to the client callback via `post_message()`.
+3. **Tests**: add a unit test in `test_client_unit.py` and an integration test in
+   `test_integration.py` (mark with `@pytest.mark.integration`).
+4. **FEATURES.md**: append a row with honest status.
+
+The `MatrixClient` exposes callback registration (`on_message`, `on_room_update`, `on_typing`,
+`on_read_receipt`) — subscribe any number of handlers without touching existing code.
+
+## Logs
+
+Runtime logs are written to `matrix-tui.log` in the working directory.
