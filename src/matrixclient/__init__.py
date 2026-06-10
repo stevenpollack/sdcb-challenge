@@ -1,0 +1,1 @@
+"""Matrix TUI client package."""
