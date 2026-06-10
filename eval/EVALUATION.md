@@ -68,6 +68,11 @@ Mandatory parts of the functional check:
   model's app as one user, has the second user send a message, and asserts the model's TUI displays
   it within the timeout. CHECK 2 failing is a functional FAIL regardless of the model's own tests —
   it catches an app that passes against a mock but does nothing against the real server.
+  *Demonstrated:* a submission that loaded rooms and looked fully working — its own offline tests
+  green — failed CHECK 2 because it had no live sync loop (new messages appeared only after manually
+  switching rooms, i.e. state was fetched on navigation, never pushed). Static metrics and the
+  model's own suite all looked healthy; only CHECK 2 caught it. This is the canonical
+  false-completion: confident, working-looking, genuinely broken on the one path that matters.
 - **Rendering / usability.** Launch the TUI and confirm the basics a human needs: the message input
   is visible and focusable, sent messages appear, the room/message panes render. A launching app is
   not necessarily a usable one (a submission shipped with the input box obscured); do not skip this.

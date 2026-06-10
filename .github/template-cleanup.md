@@ -6,6 +6,15 @@ Before/at deploy:
 - Generate a new repo from the template (GitHub: "Use this template").
 - Optionally rename to encode the model under test, e.g. `matrix-tui-bench-opus-4-8-run1`.
 - Provide `.env.local` to the run environment with real matrix.org test credentials (never commit).
+- **MANDATORY before the model starts: validate `.env.local` parses and both accounts log in.**
+  A malformed `.env.local` silently contaminates the run — the model can't verify its own work, and
+  you can't cleanly attribute any resulting failure to the model vs. your credentials file. This has
+  already cost one run's clean attribution. Run:
+  ```
+  python eval/scripts/live_sync_check.py --server-only
+  ```
+  CHECK 1 must PASS. If it fails, the file shape or credentials are wrong — fix before the model
+  starts. Never begin a run on an `.env.local` that has not passed CHECK 1.
 - EXTENSION_TASKS.md is intentionally NOT in this template. Keep it in a separate private repo and
   use it only during the post-run extensibility test.
 
