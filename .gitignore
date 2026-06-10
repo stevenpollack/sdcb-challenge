@@ -1,4 +1,12 @@
 .env.local
+.env
+*.egg-info/
+.venv/
+venv/
+*.log
+.pytest_cache/
+htmlcov/
+*.store/
 
 # harness outputs (generated when grading)
 commit_size.json
