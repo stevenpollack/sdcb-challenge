@@ -1,0 +1,35 @@
+{
+  "repo_path": ".",
+  "feature_commits": {
+    "mode": "exclude",
+    "exclude_regex": "^(chore|docs|style|revert)(\\(.+\\))?:|^Merge "
+  },
+  "make": {
+    "test": "make test",
+    "coverage": "make coverage",
+    "test_report": "make test-report"
+  },
+  "meta_file": "eval.meta.json",
+  "fallback_coverage_report": "coverage-summary.json",
+  "fallback_coverage_format": "coverage-py-json",
+  "fallback_junit_report": "junit.xml",
+  "complexity": {
+    "source_dirs": [
+      "src"
+    ]
+  },
+  "duplication": {
+    "source_dirs": [
+      "src"
+    ]
+  },
+  "source_globs": [
+    "src/**",
+    "tests/**"
+  ],
+  "exclude_globs": [
+    "**/__pycache__/**",
+    "**/*.pyc",
+    "**/*.egg-info/**"
+  ]
+}
