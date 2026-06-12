@@ -85,16 +85,16 @@ do not pad with low-value features to look busy, and do not rush to a premature 
 (measured) and whether your declared-complete app actually functions both matter.
 
 **Before you tag complete, verify — do not assume.** The most damaging failure is tagging
-`run-complete` on an app that does not actually work (e.g. cannot load rooms, does not receive live
+`{{RUN_TAG}}` on an app that does not actually work (e.g. cannot load rooms, does not receive live
 messages). Run your app against the real accounts in `.env.local` and confirm the core path works
 end to end — login, room list loads, send and receive a real message — *before* declaring done.
 Tagging complete on a non-functional app is recorded as a false claim of completion and fails the
 run outright, regardless of your test results.
 
-**When you are finished:** make your final commit, then tag it `run-complete` (e.g.
-`git tag run-complete && git push origin run-complete`, or `gh release create run-complete`). This
-is your signal that the build is done and the history is frozen. Do not commit after tagging. You
-do not trigger evaluation — the evaluator does, against that tag.
+**When you are finished:** make your final commit, then tag it `{{RUN_TAG}}` (e.g.
+`git tag {{RUN_TAG}} && git push origin {{RUN_TAG}}`). This is your signal that the build is done
+and the history is frozen. Do not commit after tagging. You do not trigger evaluation — the
+evaluator does, against that tag.
 
 Ask clarifying questions now. The answers you receive are fixed and identical to those given to
 every other model under test.

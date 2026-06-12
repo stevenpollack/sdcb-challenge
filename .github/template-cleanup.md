@@ -5,6 +5,14 @@ This repo is a GitHub *template*. Each benchmark run = one repo generated from i
 Before/at deploy:
 - Generate a new repo from the template (GitHub: "Use this template").
 - Optionally rename to encode the model under test, e.g. `matrix-tui-bench-opus-4-8-run1`.
+- **Inject the run tag into `eval/PROMPT.md`.** Choose a run identifier (`runs/<model>-<effort>-<N>`,
+  e.g. `runs/sonnet-4.6-high-2`) and replace the placeholder:
+  ```
+  RUN_TAG="runs/sonnet-4.6-high-2"
+  sed -i '' "s|{{RUN_TAG}}|$RUN_TAG|g" eval/PROMPT.md
+  git add eval/PROMPT.md && git commit -m "chore: inject run tag $RUN_TAG"
+  ```
+  Do this before the model starts. The model will use this exact tag when signalling completion.
 - Provide `.env.local` to the run environment with real matrix.org test credentials (never commit).
 - **MANDATORY before the model starts: validate `.env.local` parses and both accounts log in.**
   A malformed `.env.local` silently contaminates the run — the model can't verify its own work, and
@@ -19,10 +27,11 @@ Before/at deploy:
   use it only during the post-run extensibility test.
 
 After the run (evaluator):
-- The model should have tagged `run-complete`. If it didn't (it may have degraded near the time
-  limit), tag the final commit yourself: `git tag run-complete <sha> && git push origin run-complete`.
-- Trigger the analysis: Actions tab → `post-run-analysis` → Run workflow (defaults to the
-  `run-complete` tag; override `ref` if needed). Or run the scripts locally per the root README.
+- The model should have tagged `runs/<run-id>` (the value injected into PROMPT.md). If it didn't
+  (it may have degraded near the time limit), tag the final commit yourself:
+  `git tag runs/<run-id> <sha> && git push origin runs/<run-id>`.
+- Trigger the analysis: Actions tab → `post-run-analysis` → Run workflow, overriding `ref` to
+  `runs/<run-id>`. Or run the scripts locally per the root README.
 - Before trusting trends: `cp eval/eval.config.example.json eval/eval.config.json` and adjust
   `source_globs` / `complexity.source_dirs` to the stack the model used, if it isn't `src/`.
 - Recalibrate collapse thresholds against the git history before trusting the collapse index.
