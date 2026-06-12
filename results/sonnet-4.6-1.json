@@ -1,0 +1,26 @@
+{
+  "run_id": "sonnet-4.6-1",
+  "branch": "fail/sonnet-4.6-1",
+  "template_commit": "4fd1b58",
+  "verdict": "fail",
+  "model": "claude-sonnet-4-6",
+  "effort": null,
+  "cost_usd": 28.18,
+  "duration_min": null,
+  "source_repo": "https://github.com/stevenpollack/jubilant-pancake",
+  "tests": {
+    "total": 168,
+    "passing": 168,
+    "failing": 0,
+    "errors": 0
+  },
+  "coverage_pct": 95.7,
+  "features": {
+    "working": 55,
+    "partial": 2,
+    "broken": 2,
+    "untested": 1
+  },
+  "live_sync": null,
+  "notes": "No live_sync_check.json present; evaluation not completed."
+}

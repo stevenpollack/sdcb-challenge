@@ -1,0 +1,32 @@
+{
+  "run_id": "sonnet-4.6-high-1",
+  "branch": "pass/sonnet-4.6-high-1",
+  "template_commit": "cb4b40c",
+  "verdict": "pass",
+  "model": "claude-sonnet-4-6",
+  "effort": "high",
+  "cost_usd": 2.97,
+  "duration_min": 16,
+  "source_repo": "https://github.com/stevenpollack/fluffy-parakeet",
+  "tests": {
+    "total": 11,
+    "passing": 11,
+    "failing": 0,
+    "errors": 0
+  },
+  "coverage_pct": 34.1,
+  "features": {
+    "working": 18,
+    "partial": 4,
+    "broken": 2,
+    "untested": 1
+  },
+  "live_sync": {
+    "overall_passed": false,
+    "checks_run": ["server_truth", "tui_receive"],
+    "server_truth": true,
+    "tui_receive": false,
+    "tui_receive_failure": "Env var mismatch: evaluator passed MATRIX_USER, model expected MATRIX_USERNAME or equivalent."
+  },
+  "notes": "Verdict set by evaluator; live_sync tui_receive failure attributed to evaluator env var naming, not model."
+}

@@ -1,0 +1,30 @@
+{
+  "run_id": "sonnet-4.6-2",
+  "branch": "fail/sonnet-4.6-2",
+  "template_commit": "e59f507",
+  "verdict": "fail",
+  "model": "claude-sonnet-4-6",
+  "effort": null,
+  "cost_usd": 5.95,
+  "duration_min": 37,
+  "source_repo": "https://github.com/stevenpollack/bookish-memory",
+  "tests": {
+    "total": 22,
+    "passing": 22,
+    "failing": 0,
+    "errors": 0
+  },
+  "coverage_pct": 34.0,
+  "features": {
+    "working": 15,
+    "partial": 2,
+    "broken": 2,
+    "untested": 1
+  },
+  "live_sync": {
+    "overall_passed": false,
+    "checks_run": ["server_truth"],
+    "notes": "Only server_truth (check 1) ran. App logged in but displayed no rooms; tui_receive not attempted."
+  },
+  "notes": "App launched but rendered no room list; zero features gradeable."
+}
