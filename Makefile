@@ -13,6 +13,16 @@
 #
 # After implementing, also set the real report paths in eval.meta.json.
 
+# ── Deployer target (run once after creating the repo from the template) ──────
+# Usage: make clean-up RUN_TAG=runs/sonnet-4.6-high-2
+.PHONY: clean-up
+clean-up:
+	@[ -n "$(RUN_TAG)" ] || { echo "Usage: make clean-up RUN_TAG=runs/<model>-<effort>-<N>"; exit 1; }
+	python3 -c "import pathlib; p=pathlib.Path('eval/PROMPT.md'); p.write_text(p.read_text().replace('{{RUN_TAG}}', '$(RUN_TAG)'))"
+	git add eval/PROMPT.md
+	git commit -m "chore: inject run tag $(RUN_TAG)"
+
+# ── Harness targets (implemented by the model) ────────────────────────────────
 .PHONY: setup run test coverage test-report lint
 
 setup:

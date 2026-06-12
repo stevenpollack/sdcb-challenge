@@ -6,11 +6,9 @@ Before/at deploy:
 - Generate a new repo from the template (GitHub: "Use this template").
 - Optionally rename to encode the model under test, e.g. `matrix-tui-bench-opus-4-8-run1`.
 - **Inject the run tag into `eval/PROMPT.md`.** Choose a run identifier (`runs/<model>-<effort>-<N>`,
-  e.g. `runs/sonnet-4.6-high-2`) and replace the placeholder:
+  e.g. `runs/sonnet-4.6-high-2`) and run:
   ```
-  RUN_TAG="runs/sonnet-4.6-high-2"
-  sed -i '' "s|{{RUN_TAG}}|$RUN_TAG|g" eval/PROMPT.md
-  git add eval/PROMPT.md && git commit -m "chore: inject run tag $RUN_TAG"
+  make clean-up RUN_TAG=runs/sonnet-4.6-high-2
   ```
   Do this before the model starts. The model will use this exact tag when signalling completion.
 - Provide `.env.local` to the run environment with real matrix.org test credentials (never commit).
